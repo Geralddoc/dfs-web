@@ -500,14 +500,14 @@ export default function AgroProcessorsPage() {
                     onClick={() => fileInputRef.current?.click()}
                     disabled={isImporting}
                 >
-                    {isImporting ? "Importing..." : "Import Excel"}
+                    {isImporting ? "Importing..." : "Import Farmer"}
                 </button>
                 <button
                     className={`text-white px-5 py-2.5 rounded-lg shadow-md transition-all font-medium ${isImporting ? "bg-indigo-400 cursor-not-allowed" : "bg-indigo-600 hover:bg-indigo-700"}`}
                     onClick={() => tailoredFileInputRef.current?.click()}
                     disabled={isImporting}
                 >
-                    {isImporting ? "Importing..." : "Add Agro Import"}
+                    {isImporting ? "Importing..." : "Agro Import"}
                 </button>
                 {lastImportedIds.length > 0 && (
                     <button

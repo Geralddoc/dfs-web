@@ -447,14 +447,14 @@ export default function FarmersPage() {
                         onClick={() => fileInputRef.current?.click()}
                         disabled={isImporting}
                     >
-                        {isImporting ? "Importing..." : "Import Excel"}
+                        {isImporting ? "Importing..." : "Import Farmer"}
                     </button>
                     <button
                         className={`text-white px-5 py-2.5 rounded-lg shadow-md transition-all font-medium ${isImporting ? "bg-indigo-400 cursor-not-allowed" : "bg-indigo-600 hover:bg-indigo-700"}`}
                         onClick={() => tailoredAgroFileInputRef.current?.click()}
                         disabled={isImporting}
                     >
-                        {isImporting ? "Importing..." : "Add Agro Import"}
+                        {isImporting ? "Importing..." : "Agro Import"}
                     </button>
                     <button
                         className="bg-red-800 text-white px-5 py-2.5 rounded-lg hover:bg-black shadow-md transition-all font-medium"
