@@ -10,6 +10,7 @@
 
 import type * as agroProcessors from "../agroProcessors.js";
 import type * as auth_index from "../auth/index.js";
+import type * as business from "../business.js";
 import type * as farmers from "../farmers.js";
 import type * as users from "../users.js";
 import type * as visits from "../visits.js";
@@ -23,6 +24,7 @@ import type {
 declare const fullApi: ApiFromModules<{
   agroProcessors: typeof agroProcessors;
   "auth/index": typeof auth_index;
+  business: typeof business;
   farmers: typeof farmers;
   users: typeof users;
   visits: typeof visits;

@@ -19,16 +19,15 @@ export const addAgroProcessor = mutation({
         ref: v.optional(v.string()),
         quantities: v.optional(v.string()),
         email: v.optional(v.string()),
-        // Extended fields to match import and Farmers schema
-        date: v.optional(v.string()), // Kept for backward compatibility/visit logic
+        date: v.optional(v.string()),
         dateOfVisit: v.optional(v.string()),
         status: v.optional(v.string()),
         remarks: v.optional(v.string()),
+        lat: v.optional(v.number()),
+        lng: v.optional(v.number()),
     },
     handler: async (ctx, args) => {
         const { date, ...data } = args;
-
-        // Use dateOfVisit if provided, or date, or fallback
         const visitDate = args.dateOfVisit || date || new Date().toLocaleDateString();
 
         const processorData = {
@@ -39,7 +38,14 @@ export const addAgroProcessor = mutation({
 
         const processorId = await ctx.db.insert("agroProcessors", processorData);
 
-        // Also record as a visit if date or remarks exist, for history
+        await ctx.db.insert("auditLogs", {
+            action: "create",
+            table: "agroProcessors",
+            recordId: processorId,
+            after: processorData,
+            timestamp: new Date().toISOString(),
+        });
+
         if (visitDate || args.remarks) {
             await ctx.db.insert("visits", {
                 relatedId: processorId,
@@ -63,17 +69,36 @@ export const updateAgroProcessor = mutation({
         ref: v.optional(v.string()),
         quantities: v.optional(v.string()),
         email: v.optional(v.string()),
+        lat: v.optional(v.number()),
+        lng: v.optional(v.number()),
     },
     handler: async (ctx, args) => {
         const { id, ...rest } = args;
+        const before = await ctx.db.get(id);
         await ctx.db.patch(id, rest);
+        await ctx.db.insert("auditLogs", {
+            action: "update",
+            table: "agroProcessors",
+            recordId: id,
+            before,
+            after: rest,
+            timestamp: new Date().toISOString(),
+        });
     },
 });
 
 export const deleteAgroProcessor = mutation({
     args: { id: v.id("agroProcessors") },
     handler: async (ctx, args) => {
+        const before = await ctx.db.get(args.id);
         await ctx.db.delete(args.id);
+        await ctx.db.insert("auditLogs", {
+            action: "delete",
+            table: "agroProcessors",
+            recordId: args.id,
+            before,
+            timestamp: new Date().toISOString(),
+        });
     },
 });
 
@@ -93,6 +118,8 @@ export const bulkAddAgroProcessors = mutation({
             status: v.optional(v.string()),
             remarks: v.optional(v.string()),
             type: v.optional(v.string()),
+            lat: v.optional(v.number()),
+            lng: v.optional(v.number()),
         })),
     },
     handler: async (ctx, args) => {
@@ -107,7 +134,6 @@ export const bulkAddAgroProcessors = mutation({
             const id = await ctx.db.insert("agroProcessors", dataWithDefaults);
             ids.push(id);
 
-            // Also record a visit for the import
             await ctx.db.insert("visits", {
                 relatedId: id,
                 type: "AgroProcessor",
@@ -116,6 +142,16 @@ export const bulkAddAgroProcessors = mutation({
             });
         }
         return ids;
+    },
+});
+
+export const searchProcessors = query({
+    args: { query: v.string() },
+    handler: async (ctx, args) => {
+        return await ctx.db
+            .query("agroProcessors")
+            .withSearchIndex("search_name", (q) => q.search("name", args.query))
+            .collect();
     },
 });
 

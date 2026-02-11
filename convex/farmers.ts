@@ -20,9 +20,18 @@ export const addFarmer = mutation({
         quantities: v.optional(v.string()),
         dateOfVisit: v.optional(v.string()),
         status: v.optional(v.string()),
+        lat: v.optional(v.number()),
+        lng: v.optional(v.number()),
     },
     handler: async (ctx, args) => {
-        await ctx.db.insert("farmers", args);
+        const id = await ctx.db.insert("farmers", args);
+        await ctx.db.insert("auditLogs", {
+            action: "create",
+            table: "farmers",
+            recordId: id,
+            after: args,
+            timestamp: new Date().toISOString(),
+        });
     },
 });
 
@@ -39,17 +48,36 @@ export const updateFarmer = mutation({
         quantities: v.optional(v.string()),
         dateOfVisit: v.optional(v.string()),
         status: v.optional(v.string()),
+        lat: v.optional(v.number()),
+        lng: v.optional(v.number()),
     },
     handler: async (ctx, args) => {
         const { id, ...rest } = args;
+        const before = await ctx.db.get(id);
         await ctx.db.patch(id, rest);
+        await ctx.db.insert("auditLogs", {
+            action: "update",
+            table: "farmers",
+            recordId: id,
+            before,
+            after: rest,
+            timestamp: new Date().toISOString(),
+        });
     },
 });
 
 export const deleteFarmer = mutation({
     args: { id: v.id("farmers") },
     handler: async (ctx, args) => {
+        const before = await ctx.db.get(args.id);
         await ctx.db.delete(args.id);
+        await ctx.db.insert("auditLogs", {
+            action: "delete",
+            table: "farmers",
+            recordId: args.id,
+            before,
+            timestamp: new Date().toISOString(),
+        });
     },
 });
 
@@ -66,6 +94,8 @@ export const bulkAddFarmers = mutation({
             quantities: v.optional(v.string()),
             dateOfVisit: v.optional(v.string()),
             status: v.optional(v.string()),
+            lat: v.optional(v.number()),
+            lng: v.optional(v.number()),
         })),
     },
     handler: async (ctx, args) => {
@@ -84,6 +114,16 @@ export const bulkDeleteFarmers = mutation({
         for (const id of args.ids) {
             await ctx.db.delete(id);
         }
+    },
+});
+
+export const searchFarmers = query({
+    args: { query: v.string() },
+    handler: async (ctx, args) => {
+        return await ctx.db
+            .query("farmers")
+            .withSearchIndex("search_name", (q) => q.search("name", args.query))
+            .collect();
     },
 });
 
