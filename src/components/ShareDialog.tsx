@@ -41,7 +41,10 @@ export function ShareDialog({ isOpen, onClose }: ShareDialogProps) {
     };
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+        <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
+            onClick={(e) => e.target === e.currentTarget && onClose()}
+        >
             <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden transform transition-all">
                 {/* Header */}
                 <div className="bg-purple-600 p-6 text-white flex justify-between items-center">

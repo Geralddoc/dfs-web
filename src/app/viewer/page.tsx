@@ -3,6 +3,7 @@
 import { useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { useState } from "react";
+import Link from "next/link";
 import { Dashboard } from "../../components/analytics/Dashboard";
 import { FilterPopover } from "../../components/ui/filter-popover";
 import { AiAssistant } from "../../components/AiAssistant";
@@ -65,6 +66,15 @@ export default function ViewerPage() {
                     <p className="text-slate-500 text-sm mt-1">Limited access: Read-only visibility for monitoring and analytics.</p>
                 </div>
                 <div className="space-x-4 flex items-center">
+                    <Link
+                        href="/farmers"
+                        className="bg-slate-100 text-slate-600 px-5 py-2.5 rounded-lg hover:bg-slate-200 transition-all font-medium flex items-center gap-2"
+                    >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                        </svg>
+                        Go Back
+                    </Link>
                     <button
                         className="bg-indigo-600 text-white px-5 py-2.5 rounded-lg hover:bg-indigo-700 shadow-md transition-all font-medium"
                         onClick={() => setViewMode("analytics")}
