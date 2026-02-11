@@ -23,6 +23,7 @@ export default defineSchema({
     businessName: v.string(),
     address: v.string(),
     contact: v.string(),
+    district: v.string(), // New field
     commodities: v.array(v.string()),
   }),
 

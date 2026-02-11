@@ -26,3 +26,10 @@ export const getByEmail = query({
     return user;
   },
 });
+
+export const get = query({
+  args: {},
+  handler: async (ctx) => {
+    return await ctx.auth.getUserIdentity();
+  },
+});

@@ -14,10 +14,24 @@ export const addAgroProcessor = mutation({
         businessName: v.string(),
         address: v.string(),
         contact: v.string(),
+        district: v.string(),
         commodities: v.array(v.string()),
+        // Optional initial visit data
+        date: v.optional(v.string()),
+        remarks: v.optional(v.string()),
     },
     handler: async (ctx, args) => {
-        await ctx.db.insert("agroProcessors", args);
+        const { date, remarks, ...processorData } = args;
+        const processorId = await ctx.db.insert("agroProcessors", processorData);
+
+        if (date || remarks) {
+            await ctx.db.insert("visits", {
+                relatedId: processorId,
+                type: "AgroProcessor",
+                date: date || new Date().toISOString(),
+                remarks: remarks || "",
+            });
+        }
     },
 });
 
@@ -28,6 +42,7 @@ export const updateAgroProcessor = mutation({
         businessName: v.string(),
         address: v.string(),
         contact: v.string(),
+        district: v.string(),
         commodities: v.array(v.string()),
     },
     handler: async (ctx, args) => {
