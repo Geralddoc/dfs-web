@@ -11,6 +11,7 @@ import { generateWordReport } from "../../lib/word";
 import { Dashboard } from "../../components/analytics/Dashboard";
 import { FilterPopover } from "../../components/ui/filter-popover";
 import { AiAssistant } from "../../components/AiAssistant";
+import { ShareDialog } from "../../components/ShareDialog";
 
 export default function AgroProcessorsPage() {
     const processors = useQuery(api.agroProcessors.getAgroProcessors);
@@ -30,6 +31,7 @@ export default function AgroProcessorsPage() {
     const [editingId, setEditingId] = useState<Id<"agroProcessors"> | null>(null);
     const [viewMode, setViewMode] = useState<"list" | "analytics">("list"); // New state for view mode
     const [isImporting, setIsImporting] = useState(false);
+    const [isShareOpen, setIsShareOpen] = useState(false);
 
     // Filtering State
     const [selectedDistricts, setSelectedDistricts] = useState<string[]>([]);
@@ -375,6 +377,10 @@ export default function AgroProcessorsPage() {
         reader.readAsBinaryString(file);
     };
 
+    const handleShare = () => {
+        setIsShareOpen(true);
+    };
+
     const handleUndoImport = async () => {
         if (lastImportedIds.length === 0) return;
         if (confirm("Are you sure you want to undo the last import?")) {
@@ -394,7 +400,11 @@ export default function AgroProcessorsPage() {
                     >
                         ← Back to List
                     </button>
-                    <Dashboard data={filteredProcessors || []} type="AgroProcessor" />
+                    <Dashboard
+                        farmers={farmers || []}
+                        agroProcessors={filteredProcessors || []}
+                        initialType="AgroProcessor"
+                    />
                 </div>
             </div>
         );
@@ -405,6 +415,15 @@ export default function AgroProcessorsPage() {
             <div className="flex justify-between items-center mb-8 bg-white p-6 rounded-lg shadow-sm">
                 <h1 className="text-3xl font-extrabold text-slate-800 tracking-tight">Agro Processors Management</h1>
                 <div className="space-x-4 flex items-center">
+                    <button
+                        className="bg-purple-600 text-white px-5 py-2.5 rounded-lg hover:bg-purple-700 shadow-md transition-all font-medium flex items-center space-x-2"
+                        onClick={handleShare}
+                    >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+                        </svg>
+                        <span>Share View</span>
+                    </button>
                     <button
                         className="bg-indigo-600 text-white px-5 py-2.5 rounded-lg hover:bg-indigo-700 shadow-md transition-all font-medium"
                         onClick={() => setViewMode("analytics")}
@@ -641,6 +660,8 @@ export default function AgroProcessorsPage() {
                     </tbody>
                 </table>
             </div>
+            {/* Share Dialog */}
+            <ShareDialog isOpen={isShareOpen} onClose={() => setIsShareOpen(false)} />
         </div >
     );
 
