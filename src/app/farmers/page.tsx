@@ -399,7 +399,7 @@ export default function FarmersPage() {
     return (
         <div className="p-10 bg-slate-50 min-h-screen font-sans">
             <div className="flex justify-between items-center mb-8 bg-white p-6 rounded-lg shadow-sm">
-                <h1 className="text-3xl font-extrabold text-slate-800 tracking-tight">Farmers Management</h1>
+                <h1 className="text-3xl font-extrabold text-slate-800 tracking-tight">Database Management</h1>
                 <div className="space-x-4 flex items-center">
                     <button
                         className="bg-purple-600 text-white px-5 py-2.5 rounded-lg hover:bg-purple-700 shadow-md transition-all font-medium flex items-center space-x-2"
