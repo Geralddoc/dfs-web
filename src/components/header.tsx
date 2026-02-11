@@ -7,6 +7,10 @@ import { UserState } from "@/components/user-state";
 
 export function Header() {
   const { isAuthenticated, isLoading } = useConvexAuth();
+  // Assuming 'user' would be fetched or passed down if this conditional rendering is intended.
+  // For the purpose of this edit, 'user' is not defined in this component's scope.
+  // If 'user' is meant to be available, it would typically come from a hook like useQuery or context.
+  const user = null; // Placeholder to make the code syntactically valid for the snippet.
 
   return (
     <header className="bg-white shadow-sm border-b">
@@ -16,11 +20,30 @@ export function Header() {
             <h1 className="text-xl font-bold text-gray-900">The Division of Food Security</h1>
           </div>
           <div className="flex items-center space-x-4">
-            <span className="font-semibold text-gray-700 mr-4">Tobago House of Assembly</span>
-            <UserState />
+            {isAuthenticated ? (
+              <div className="flex items-center space-x-4">
+                <UserMenu />
+              </div>
+            ) : (
+              <SignInButton />
+            )}
           </div>
         </div>
       </div>
     </header>
   );
+}
+
+function UserMenu() {
+  return (
+    <div className="text-sm text-slate-600">
+      Authenticated
+    </div>
+  )
+}
+
+function SignInButton() {
+  return (
+    <button className="text-sm text-blue-600">Sign In</button>
+  )
 }

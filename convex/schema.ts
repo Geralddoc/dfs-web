@@ -16,15 +16,24 @@ export default defineSchema({
     address: v.string(),
     contact: v.string(),
     commodities: v.array(v.string()), // Array of commodities
+    ref: v.optional(v.string()), // REF#
+    email: v.optional(v.string()), // EMAIL
+    district: v.optional(v.string()), // DISTRICT
+    quantities: v.optional(v.string()), // QUANTITIES
+    dateOfVisit: v.optional(v.string()), // DATE OF VISIT
+    status: v.optional(v.string()), // CURRENT STATUS
   }),
 
   agroProcessors: defineTable({
     name: v.string(),
-    businessName: v.string(),
+    businessName: v.optional(v.string()),
     address: v.string(),
     contact: v.string(),
-    district: v.string(), // New field
+    district: v.string(),
     commodities: v.array(v.string()),
+    ref: v.optional(v.string()), // REF#
+    quantities: v.optional(v.string()), // QUANTITIES
+    email: v.optional(v.string()),
   }),
 
   visits: defineTable({

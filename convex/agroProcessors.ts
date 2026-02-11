@@ -11,11 +11,14 @@ export const getAgroProcessors = query({
 export const addAgroProcessor = mutation({
     args: {
         name: v.string(),
-        businessName: v.string(),
+        businessName: v.optional(v.string()),
         address: v.string(),
         contact: v.string(),
         district: v.string(),
         commodities: v.array(v.string()),
+        ref: v.optional(v.string()),
+        quantities: v.optional(v.string()),
+        email: v.optional(v.string()),
         // Optional initial visit data
         date: v.optional(v.string()),
         remarks: v.optional(v.string()),
@@ -39,11 +42,14 @@ export const updateAgroProcessor = mutation({
     args: {
         id: v.id("agroProcessors"),
         name: v.string(),
-        businessName: v.string(),
+        businessName: v.optional(v.string()),
         address: v.string(),
         contact: v.string(),
         district: v.string(),
         commodities: v.array(v.string()),
+        ref: v.optional(v.string()),
+        quantities: v.optional(v.string()),
+        email: v.optional(v.string()),
     },
     handler: async (ctx, args) => {
         const { id, ...rest } = args;
@@ -55,5 +61,38 @@ export const deleteAgroProcessor = mutation({
     args: { id: v.id("agroProcessors") },
     handler: async (ctx, args) => {
         await ctx.db.delete(args.id);
+    },
+});
+
+export const bulkAddAgroProcessors = mutation({
+    args: {
+        processors: v.array(v.object({
+            name: v.string(),
+            businessName: v.optional(v.string()),
+            address: v.string(),
+            contact: v.string(),
+            district: v.string(), // Ensure schema field is present
+            commodities: v.array(v.string()),
+            ref: v.optional(v.string()),
+            quantities: v.optional(v.string()),
+            email: v.optional(v.string()),
+        })),
+    },
+    handler: async (ctx, args) => {
+        const ids = [];
+        for (const processor of args.processors) {
+            const id = await ctx.db.insert("agroProcessors", processor);
+            ids.push(id);
+        }
+        return ids;
+    },
+});
+
+export const bulkDeleteAgroProcessors = mutation({
+    args: { ids: v.array(v.id("agroProcessors")) },
+    handler: async (ctx, args) => {
+        for (const id of args.ids) {
+            await ctx.db.delete(id);
+        }
     },
 });
