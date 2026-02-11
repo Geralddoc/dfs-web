@@ -34,6 +34,10 @@ export default defineSchema({
     ref: v.optional(v.string()), // REF#
     quantities: v.optional(v.string()), // QUANTITIES
     email: v.optional(v.string()),
+    dateOfVisit: v.optional(v.string()), // DATE OF VISIT
+    status: v.optional(v.string()), // CURRENT STATUS
+    remarks: v.optional(v.string()), // REMARKS
+    type: v.optional(v.string()), // "AgroProcessor" - useful for mixed queries
   }),
 
   visits: defineTable({

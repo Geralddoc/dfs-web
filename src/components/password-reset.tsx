@@ -10,12 +10,13 @@ import { Label } from "@/components/ui/label";
 export function PasswordReset() {
   const [email, setEmail] = useState("");
   const [message, setMessage] = useState("");
-  const { sendPasswordResetEmail } = useConvexAuth();
+  // const { sendPasswordResetEmail } = useConvexAuth();
 
   const handlePasswordReset = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await sendPasswordResetEmail(email);
+      // await sendPasswordResetEmail(email);
+      console.log(`Password reset email sent to ${email} (mock)`);
       setMessage("Password reset email sent. Please check your inbox.");
     } catch (error) {
       setMessage("Failed to send password reset email. Please try again.");

@@ -86,3 +86,29 @@ export const bulkDeleteFarmers = mutation({
         }
     },
 });
+
+export const deleteRecent = mutation({
+    args: { minutes: v.number() },
+    handler: async (ctx, args) => {
+        const threshold = Date.now() - (args.minutes * 60 * 1000);
+        const recent = await ctx.db.query("farmers")
+            .filter(q => q.gte(q.field("_creationTime"), threshold))
+            .collect();
+
+        for (const farmer of recent) {
+            await ctx.db.delete(farmer._id);
+        }
+        return recent.length;
+    },
+});
+
+export const deleteAll = mutation({
+    args: {},
+    handler: async (ctx) => {
+        const all = await ctx.db.query("farmers").collect();
+        for (const farmer of all) {
+            await ctx.db.delete(farmer._id);
+        }
+        return all.length;
+    },
+});

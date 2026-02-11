@@ -1,7 +1,7 @@
 const XLSX = require('xlsx');
 const fs = require('fs');
 
-const filename = "Printable districts of farmers, agro-processors final (Autosaved).xlsx";
+const filename = process.argv[2] || "Printable districts of farmers, agro-processors final (Autosaved).xlsx";
 
 try {
     const workbook = XLSX.readFile(filename);

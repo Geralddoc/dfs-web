@@ -68,9 +68,9 @@ export const generateWordReport = async (
                     rows: [
                         new TableRow({
                             children: [
-                                new TableCell({ children: [new Paragraph({ text: "Name", bold: true })] }),
-                                new TableCell({ children: [new Paragraph({ text: "Business Name", bold: true })] }),
-                                new TableCell({ children: [new Paragraph({ text: "Address", bold: true })] }),
+                                new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Name", bold: true })] })] }),
+                                new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Business Name", bold: true })] })] }),
+                                new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Address", bold: true })] })] }),
                             ],
                         }),
                         ...agroProcessors.map(ap => (

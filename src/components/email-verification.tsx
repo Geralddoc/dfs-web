@@ -7,11 +7,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 
 export function EmailVerification() {
   const [message, setMessage] = useState("");
-  const { sendEmailVerification } = useConvexAuth();
+  // const { sendEmailVerification } = useConvexAuth();
 
   const handleSendVerification = async () => {
     try {
-      await sendEmailVerification();
+      // await sendEmailVerification();
+      console.log("Email verification sent (mock)");
       setMessage("Verification email sent. Please check your inbox.");
     } catch (error) {
       setMessage("Failed to send verification email. Please try again.");

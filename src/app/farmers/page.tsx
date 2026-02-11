@@ -7,21 +7,56 @@ import { Id } from "../../../convex/_generated/dataModel";
 import * as XLSX from "xlsx";
 
 import { Dashboard } from "../../components/analytics/Dashboard";
+import { FilterPopover } from "../../components/ui/filter-popover";
+import { AiAssistant } from "../../components/AiAssistant";
 
 export default function FarmersPage() {
     const farmers = useQuery(api.farmers.getFarmers);
-    // ... existing hooks ...
+    const agroProcessors = useQuery(api.agroProcessors.getAgroProcessors);
+
+    // Mutations
     const addFarmer = useMutation(api.farmers.addFarmer);
     const updateFarmer = useMutation(api.farmers.updateFarmer);
     const deleteFarmer = useMutation(api.farmers.deleteFarmer);
     const bulkAddFarmers = useMutation(api.farmers.bulkAddFarmers);
     const bulkDeleteFarmers = useMutation(api.farmers.bulkDeleteFarmers);
-
+    const bulkAddAgroProcessors = useMutation(api.agroProcessors.bulkAddAgroProcessors);
+    // @ts-ignore
+    const flattenFarmers = useMutation(api.farmers.flattenFarmers);
+    // @ts-ignore
+    const deleteRecent = useMutation(api.farmers.deleteRecent);
+    // @ts-ignore
+    const deleteAll = useMutation(api.farmers.deleteAll);
     const [newFarmer, setNewFarmer] = useState({ name: "", address: "", contact: "", commodities: "" });
     const [editingId, setEditingId] = useState<Id<"farmers"> | null>(null);
-    const [showAgroProcessorForm, setShowAgroProcessorForm] = useState(false);
+    const [showAgroForm, setShowAgroForm] = useState(false);
+    const [showFarmerForm, setShowFarmerForm] = useState(false);
     const [viewMode, setViewMode] = useState<"list" | "analytics">("list"); // New state for view mode
+    const [activeTab, setActiveTab] = useState<"farmers" | "agroProcessors">("farmers");
     const [isImporting, setIsImporting] = useState(false);
+
+    // Filtering State
+    const [selectedDistricts, setSelectedDistricts] = useState<string[]>([]);
+    const [selectedCommodities, setSelectedCommodities] = useState<string[]>([]);
+
+    // Derived Data for Filters
+    const uniqueDistricts = Array.from(new Set((farmers || []).map(f => f.district).filter(Boolean) as string[])).sort();
+    const uniqueCommodities = Array.from(new Set((farmers || []).flatMap(f => f.commodities)
+        .map(c => c.trim())
+        .filter(c => c && /[a-zA-Z]/.test(c))
+    )).sort();
+
+    // Filter Logic
+    const filteredFarmers = farmers?.filter(farmer => {
+        const matchesDistrict = selectedDistricts.length === 0 || (farmer.district && selectedDistricts.includes(farmer.district));
+        const matchesCommodity = selectedCommodities.length === 0 || farmer.commodities.some(c => selectedCommodities.includes(c));
+        return matchesDistrict && matchesCommodity;
+    });
+
+    const handleAiFilter = (filters: { district?: string[], commodities?: string[] }) => {
+        if (filters.district) setSelectedDistricts(filters.district);
+        if (filters.commodities) setSelectedCommodities(filters.commodities);
+    };
 
     // ... existing handlers (handleAdd, handleUpdate, handleDelete, startEdit, agro processor logic, import logic) ...
     const handleAdd = async () => {
@@ -30,6 +65,7 @@ export default function FarmersPage() {
             commodities: newFarmer.commodities.split(",").map(c => c.trim()),
         });
         setNewFarmer({ name: "", address: "", contact: "", commodities: "" });
+        setShowFarmerForm(false);
     };
 
     const handleUpdate = async (id: Id<"farmers">) => {
@@ -72,12 +108,127 @@ export default function FarmersPage() {
             date: newProcessor.date,
             remarks: newProcessor.remarks
         });
-        setShowAgroProcessorForm(false);
+        setShowAgroForm(false);
         setNewProcessor({ name: "", businessName: "", address: "", contact: "", district: "", commodities: "", date: "", remarks: "" });
     };
 
     const [lastImportedIds, setLastImportedIds] = useState<Id<"farmers">[]>([]);
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const tailoredAgroFileInputRef = useRef<HTMLInputElement>(null);
+
+    const handleTailoredAgroFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        setIsImporting(true);
+        const reader = new FileReader();
+        reader.onload = async (evt) => {
+            try {
+                const data = evt.target?.result;
+                if (!data) throw new Error("Could not read file data");
+
+                const wb = XLSX.read(data, { type: "array" });
+
+                console.log("Tailored Agro Import (from Farmers): Scanning sheets...", wb.SheetNames);
+                let sheetName = wb.SheetNames.find(name => name.trim().toLowerCase() === "print by districta agro") ||
+                    wb.SheetNames.find(name => name.trim().toUpperCase().includes("AGRO")) ||
+                    wb.SheetNames[0];
+
+                console.log(`Tailored Agro Import: Using sheet "${sheetName}"`);
+                const ws = wb.Sheets[sheetName];
+                const rawRows = XLSX.utils.sheet_to_json(ws);
+                console.log(`Tailored Agro Import: Read ${rawRows.length} raw rows`);
+
+                let headerRowIndex = -1;
+                if (rawRows.length > 0) {
+                    for (let i = 0; i < Math.min(rawRows.length, 5); i++) {
+                        const row: any = rawRows[i];
+                        const keys = Object.keys(row);
+                        if (keys.some(key => key.trim().toLowerCase().match(/^(no\.|ref|name|business|address|district|phone|email|commodit|quantit|date|status|remark)/i))) {
+                            headerRowIndex = i;
+                            break;
+                        }
+                    }
+                }
+
+                let sheetData = rawRows;
+                if (headerRowIndex > 0) {
+                    console.log(`Tailored Agro Import: Re-parsing with header at index ${headerRowIndex}`);
+                    sheetData = XLSX.utils.sheet_to_json(ws, { range: headerRowIndex });
+                }
+
+                const excelDateToJSDate = (serial: any) => {
+                    if (!serial) return "";
+                    if (typeof serial === "string") return serial;
+                    try {
+                        const utc_days = Math.floor(serial - 25569);
+                        const utc_value = utc_days * 86400;
+                        const date_info = new Date(utc_value * 1000);
+                        return date_info.toLocaleDateString();
+                    } catch (e) {
+                        return serial.toString();
+                    }
+                };
+
+                const processorsToAdd = sheetData.map((row: any) => {
+                    const normalizedRow: any = {};
+                    Object.keys(row).forEach(key => {
+                        normalizedRow[key.trim().toLowerCase()] = row[key];
+                    });
+
+                    const name = (normalizedRow["business name"] || normalizedRow["businessname"] || normalizedRow["name"] || "").toString();
+
+                    return {
+                        name: name,
+                        businessName: (normalizedRow["business name"] || normalizedRow["businessname"] || name).toString(),
+                        address: (normalizedRow["business address"] || normalizedRow["address"] || "").toString(),
+                        contact: (normalizedRow["phone#"] || normalizedRow["phone #"] || normalizedRow["contact"] || "").toString(),
+                        district: (normalizedRow["district"] || "").toString(),
+                        commodities: (normalizedRow["commodities"] || "").toString().split(",").map((c: string) => c.trim()).filter((c: string) => c),
+                        ref: (normalizedRow["ref#"] || normalizedRow["ref"] || "").toString(),
+                        quantities: (normalizedRow["quantities"] || "").toString(),
+                        email: (normalizedRow["email"] || "").toString(),
+                        dateOfVisit: excelDateToJSDate(normalizedRow["date of visit"]),
+                        status: (normalizedRow["current status"] || normalizedRow["status"] || "").toString(),
+                        remarks: (normalizedRow["remarks"] || "").toString(),
+                    };
+                }).filter(p => {
+                    const nameStr = p.name ? p.name.toString().trim() : '';
+                    return nameStr &&
+                        nameStr.toLowerCase() !== 'name' &&
+                        nameStr.toLowerCase() !== 'no.' &&
+                        nameStr.toLowerCase() !== 'business name' &&
+                        nameStr.length > 2;
+                });
+
+                console.log(`Tailored Agro Import: Found ${processorsToAdd.length} valid processors after filtering`);
+
+                if (processorsToAdd.length === 0) {
+                    alert("No valid agro-processors found in the tailored import mapping.");
+                    setIsImporting(false);
+                    return;
+                }
+
+                if (confirm(`Tailored import found ${processorsToAdd.length} processors. Proceed?`)) {
+                    const BATCH_SIZE = 50;
+                    for (let i = 0; i < processorsToAdd.length; i += BATCH_SIZE) {
+                        const batch = processorsToAdd.slice(i, i + BATCH_SIZE);
+                        console.log(`Tailored Agro Import: Sending batch ${i / BATCH_SIZE + 1}...`);
+                        await bulkAddAgroProcessors({ processors: batch });
+                    }
+                    alert(`Successfully imported ${processorsToAdd.length} tailored records.`);
+                    console.log("Tailored Agro Import: Success!");
+                }
+            } catch (error) {
+                console.error("Tailored import failed:", error);
+                alert(`Tailored import failed: ${error instanceof Error ? error.message : String(error)}`);
+            } finally {
+                setIsImporting(false);
+                if (tailoredAgroFileInputRef.current) tailoredAgroFileInputRef.current.value = "";
+            }
+        };
+        reader.readAsArrayBuffer(file);
+    };
 
     const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
@@ -88,17 +239,8 @@ export default function FarmersPage() {
             try {
                 const bstr = evt.target?.result;
                 const wb = XLSX.read(bstr, { type: "binary" });
-                const wsname = wb.SheetNames[0];
-                const ws = wb.Sheets[wsname];
-                const data = XLSX.utils.sheet_to_json(ws);
-
-                // Debugging: Log headers found
-                if (data.length > 0) {
-                    const headers = Object.keys(data[0] as object);
-                    console.log("Headers found:", headers);
-                }
-
                 const farmersToAdd: any[] = [];
+                let skippedCount = 0;
 
                 // Iterate through all sheets to find farmers
                 wb.SheetNames.forEach(sheetName => {
@@ -110,27 +252,46 @@ export default function FarmersPage() {
                     const ws = wb.Sheets[sheetName];
                     const data = XLSX.utils.sheet_to_json(ws);
 
+                    // Find header row index
+                    let headerRowIndex = -1;
                     if (data.length > 0) {
+                        for (let i = 0; i < Math.min(data.length, 5); i++) {
+                            const row: any = data[i];
+                            if (row && Object.values(row).some((cell: any) => cell && cell.toString().trim().toLowerCase().includes("name"))) {
+                                headerRowIndex = i;
+                                break;
+                            }
+                        }
+                    }
+
+                    // Re-read if we found a specific start row
+                    let sheetData = data;
+                    if (headerRowIndex > -1) {
+                        sheetData = XLSX.utils.sheet_to_json(ws, { range: headerRowIndex });
+                    }
+
+                    if (sheetData.length > 0) {
                         const excelDateToJSDate = (serial: any) => {
                             if (!serial) return "";
                             if (typeof serial === "string") return serial;
-                            // Excel serial date to JS Date
                             const utc_days = Math.floor(serial - 25569);
                             const utc_value = utc_days * 86400;
                             const date_info = new Date(utc_value * 1000);
                             return date_info.toLocaleDateString();
                         };
 
-                        const sheetFarmers = data.map((row: any) => {
+                        const sheetFarmers = sheetData.map((row: any) => {
                             const normalizedRow: any = {};
                             Object.keys(row).forEach(key => {
                                 normalizedRow[key.trim().toLowerCase()] = row[key];
                             });
 
                             return {
-                                name: normalizedRow["name"] || normalizedRow["name "] || "",
-                                address: normalizedRow["address"] || "",
-                                contact: (normalizedRow["contact"] || normalizedRow["phone #"] || "").toString(),
+                                name: normalizedRow["name"] || normalizedRow["name "] || normalizedRow["business name"] || normalizedRow["businessname"] || "",
+
+
+                                address: normalizedRow["address"] || normalizedRow["business address"] || "",
+                                contact: (normalizedRow["contact"] || normalizedRow["phone #"] || normalizedRow["phone#"] || "").toString(),
                                 commodities: (normalizedRow["commodities"] || "").toString().split(",").map((c: string) => c.trim()).filter((c: string) => c),
                                 // New fields
                                 ref: (normalizedRow["ref#"] || normalizedRow["ref"] || "").toString(),
@@ -140,19 +301,35 @@ export default function FarmersPage() {
                                 dateOfVisit: excelDateToJSDate(normalizedRow["date of visit"]),
                                 status: normalizedRow["current status"] || "",
                             };
-                        }).filter(f => f.name);
+                        }).filter(f => {
+                            if (!f.name) return false;
+
+                            // Differentiate by Code
+                            const ref = f.ref.trim().toUpperCase();
+                            // If it starts with 'AP' or 'AGRO', it's an Agro Processor
+                            if (ref.startsWith("AP") || ref.startsWith("AGRO")) {
+                                skippedCount++;
+                                return false;
+                            }
+
+                            return true;
+                        });
 
                         farmersToAdd.push(...sheetFarmers);
                     }
                 });
 
                 if (farmersToAdd.length === 0) {
-                    alert(`No valid farmers found. Headers detected: ${data.length > 0 ? Object.keys(data[0] as object).join(", ") : "None"}. Expected: Name, Address, Contact, Commodities.`);
+                    if (skippedCount > 0) {
+                        alert(`Found ${skippedCount} records, but they appear to be Agro Processors (based on Ref ID starting with 'AP' or 'AGRO').\n\nPlease upload this file on the Agro Processors page.`);
+                    } else {
+                        alert(`No valid farmers found. Expected: Name, Address, Contact, Commodities.`);
+                    }
                     setIsImporting(false);
                     return;
                 }
 
-                if (confirm(`Found ${farmersToAdd.length} farmers. Proceed with import? (This may take a moment)`)) {
+                if (confirm(`Found ${farmersToAdd.length} farmers. Proceed with import? (Skipped ${skippedCount} mostly likely Agro Processors)`)) {
                     // Batching to avoid timeouts
                     const BATCH_SIZE = 50;
                     const batches = [];
@@ -204,7 +381,7 @@ export default function FarmersPage() {
                     >
                         ← Back to List
                     </button>
-                    <Dashboard data={farmers || []} type="Farmer" />
+                    <Dashboard data={filteredFarmers || []} type="Farmer" />
                 </div>
             </div>
         );
@@ -216,7 +393,19 @@ export default function FarmersPage() {
                 <h1 className="text-3xl font-extrabold text-slate-800 tracking-tight">Farmers Management</h1>
                 <div className="space-x-4 flex items-center">
                     <button
+                        className="bg-blue-600 text-white px-5 py-2.5 rounded-lg hover:bg-blue-700 shadow-md transition-all font-medium"
+                        onClick={() => { setShowFarmerForm(true); setShowAgroForm(false); setEditingId(null); }}
+                    >
+                        Add Farmer
+                    </button>
+                    <button
                         className="bg-indigo-600 text-white px-5 py-2.5 rounded-lg hover:bg-indigo-700 shadow-md transition-all font-medium"
+                        onClick={() => { setShowAgroForm(true); setShowFarmerForm(false); setEditingId(null); }}
+                    >
+                        Add Agro
+                    </button>
+                    <button
+                        className="bg-slate-600 text-white px-5 py-2.5 rounded-lg hover:bg-slate-700 shadow-md transition-all font-medium"
                         onClick={() => setViewMode("analytics")}
                     >
                         View Analytics
@@ -228,12 +417,38 @@ export default function FarmersPage() {
                         className="hidden"
                         ref={fileInputRef}
                     />
+                    <input
+                        type="file"
+                        accept=".xlsx, .xls"
+                        onChange={handleTailoredAgroFileUpload}
+                        className="hidden"
+                        ref={tailoredAgroFileInputRef}
+                    />
                     <button
                         className={`text-white px-5 py-2.5 rounded-lg shadow-md transition-all font-medium ${isImporting ? "bg-emerald-400 cursor-not-allowed" : "bg-emerald-600 hover:bg-emerald-700"}`}
                         onClick={() => fileInputRef.current?.click()}
                         disabled={isImporting}
                     >
                         {isImporting ? "Importing..." : "Import Excel"}
+                    </button>
+                    <button
+                        className={`text-white px-5 py-2.5 rounded-lg shadow-md transition-all font-medium ${isImporting ? "bg-indigo-400 cursor-not-allowed" : "bg-indigo-600 hover:bg-indigo-700"}`}
+                        onClick={() => tailoredAgroFileInputRef.current?.click()}
+                        disabled={isImporting}
+                    >
+                        {isImporting ? "Importing..." : "Add Agro Import"}
+                    </button>
+                    <button
+                        className="bg-red-800 text-white px-5 py-2.5 rounded-lg hover:bg-black shadow-md transition-all font-medium"
+                        onClick={async () => {
+                            if (confirm("EMERGENCY UNDO: This will delete ALL farmers created in the last 30 minutes. Are you sure?")) {
+                                // @ts-ignore
+                                await deleteRecent({ minutes: 30 });
+                                alert(`Undo complete.`);
+                            }
+                        }}
+                    >
+                        Undo (30m)
                     </button>
                     {lastImportedIds.length > 0 && (
                         <button
@@ -246,83 +461,164 @@ export default function FarmersPage() {
                 </div>
             </div>
 
-            {showAgroProcessorForm ? (
-                <div className="mb-8 p-6 border border-slate-200 rounded-xl shadow-lg bg-white">
-                    <h2 className="text-2xl font-bold mb-6 text-slate-800">Add Agro Processor</h2>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <input className="border border-slate-300 p-3 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="Name" value={newProcessor.name} onChange={e => setNewProcessor({ ...newProcessor, name: e.target.value })} />
-                        <input className="border border-slate-300 p-3 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="Business Name" value={newProcessor.businessName} onChange={e => setNewProcessor({ ...newProcessor, businessName: e.target.value })} />
-                        <input className="border border-slate-300 p-3 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="Address" value={newProcessor.address} onChange={e => setNewProcessor({ ...newProcessor, address: e.target.value })} />
-                        <input className="border border-slate-300 p-3 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="District" value={newProcessor.district} onChange={e => setNewProcessor({ ...newProcessor, district: e.target.value })} />
-                        <input className="border border-slate-300 p-3 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="Contact" value={newProcessor.contact} onChange={e => setNewProcessor({ ...newProcessor, contact: e.target.value })} />
-                        <input className="border border-slate-300 p-3 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="Commodities (comma separated)" value={newProcessor.commodities} onChange={e => setNewProcessor({ ...newProcessor, commodities: e.target.value })} />
-                        <input type="date" className="border border-slate-300 p-3 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="Date of Visit" value={newProcessor.date} onChange={e => setNewProcessor({ ...newProcessor, date: e.target.value })} />
-                        <textarea className="border border-slate-300 p-3 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none md:col-span-2" placeholder="Remarks" value={newProcessor.remarks} onChange={e => setNewProcessor({ ...newProcessor, remarks: e.target.value })} />
+            {/* Filter Bar */}
+            <div className="mb-6 flex flex-wrap gap-4 items-center bg-white p-4 rounded-lg shadow-sm border border-slate-200">
+                <span className="text-slate-500 font-medium text-sm">Filter by:</span>
+                <FilterPopover
+                    title="District"
+                    options={uniqueDistricts}
+                    selected={selectedDistricts}
+                    onChange={setSelectedDistricts}
+                />
+                <FilterPopover
+                    title="Commodities"
+                    options={uniqueCommodities}
+                    selected={selectedCommodities}
+                    onChange={setSelectedCommodities}
+                />
+
+                {
+                    (selectedDistricts.length > 0 || selectedCommodities.length > 0) && (
+                        <button
+                            onClick={() => { setSelectedDistricts([]); setSelectedCommodities([]); }}
+                            className="text-sm text-red-600 hover:text-red-800 font-medium ml-auto"
+                        >
+                            Clear Filters
+                        </button>
+                    )
+                }
+                <div className="ml-auto text-sm text-slate-500">
+                    Showing {filteredFarmers?.length || 0} / {farmers?.length || 0} farmers
+                </div>
+            </div >
+
+            <AiAssistant
+                data={farmers || []}
+                type="Farmer"
+                onFilter={handleAiFilter}
+            />
+
+            {/* Stats Card */}
+            <div className="mb-6 grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div
+                    className={`p-6 rounded-xl shadow-sm border transition-all cursor-pointer flex items-center justify-between ${activeTab === "farmers" ? "bg-emerald-50 border-emerald-200 ring-2 ring-emerald-500 ring-offset-2" : "bg-white border-slate-200 hover:border-emerald-300"}`}
+                    onClick={() => setActiveTab("farmers")}
+                >
+                    <div>
+                        <p className="text-sm font-medium text-slate-500 mb-1">Total Farmers</p>
+                        <h2 className="text-3xl font-bold text-slate-800">{farmers?.length || 0}</h2>
                     </div>
-                    <div className="mt-8 space-x-4 flex justify-end">
-                        <button className="bg-slate-500 text-white px-6 py-2.5 rounded-lg hover:bg-slate-600 transition-colors font-medium" onClick={() => setShowAgroProcessorForm(false)}>Cancel</button>
-                        <button className="bg-emerald-600 text-white px-6 py-2.5 rounded-lg hover:bg-emerald-700 shadow-md transition-colors font-medium" onClick={handleAddAgroProcessor}>Save Agro Processor</button>
+                    <div className={`h-12 w-12 rounded-full flex items-center justify-center ${activeTab === "farmers" ? "bg-emerald-200" : "bg-emerald-50"}`}>
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                        </svg>
                     </div>
                 </div>
-            ) : (
-                <div className="mb-8 p-6 border border-slate-200 rounded-xl shadow-lg bg-white">
-                    <h2 className="text-2xl font-bold mb-6 text-slate-800">{editingId ? "Edit Farmer" : "Add New Farmer"}</h2>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <input
-                            className="border border-slate-300 p-3 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
-                            placeholder="Name"
-                            value={newFarmer.name}
-                            onChange={e => setNewFarmer({ ...newFarmer, name: e.target.value })}
-                        />
-                        <input
-                            className="border border-slate-300 p-3 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
-                            placeholder="Address"
-                            value={newFarmer.address}
-                            onChange={e => setNewFarmer({ ...newFarmer, address: e.target.value })}
-                        />
-                        <input
-                            className="border border-slate-300 p-3 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
-                            placeholder="Contact"
-                            value={newFarmer.contact}
-                            onChange={e => setNewFarmer({ ...newFarmer, contact: e.target.value })}
-                        />
-                        <input
-                            className="border border-slate-300 p-3 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
-                            placeholder="Commodities (comma separated)"
-                            value={newFarmer.commodities}
-                            onChange={e => setNewFarmer({ ...newFarmer, commodities: e.target.value })}
-                        />
+
+                <div
+                    className={`p-6 rounded-xl shadow-sm border transition-all cursor-pointer flex items-center justify-between ${activeTab === "agroProcessors" ? "bg-indigo-50 border-indigo-200 ring-2 ring-indigo-500 ring-offset-2" : "bg-white border-slate-200 hover:border-indigo-300"}`}
+                    onClick={() => setActiveTab("agroProcessors")}
+                >
+                    <div>
+                        <p className="text-sm font-medium text-slate-500 mb-1">Total Agro Processors</p>
+                        <h2 className="text-3xl font-bold text-slate-800">{agroProcessors?.length || 0}</h2>
                     </div>
-                    <div className="mt-8 flex justify-between items-center">
-                        <div className="space-x-4">
-                            {!editingId && (
-                                <button
-                                    className="bg-purple-600 text-white px-6 py-2.5 rounded-lg hover:bg-purple-700 shadow-md transition-all font-medium"
-                                    onClick={() => setShowAgroProcessorForm(true)}
-                                >
-                                    Add Agro Processor
-                                </button>
-                            )}
+                    <div className={`h-12 w-12 rounded-full flex items-center justify-center ${activeTab === "agroProcessors" ? "bg-indigo-200" : "bg-indigo-50"}`}>
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                        </svg>
+                    </div>
+                </div>
+            </div>
+
+            {
+                showAgroForm && (
+                    <div className="mb-8 p-6 border border-slate-200 rounded-xl shadow-lg bg-white">
+                        <h2 className="text-2xl font-bold mb-6 text-slate-800">Add Agro Processor</h2>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <input className="border border-slate-300 p-3 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="Name" value={newProcessor.name} onChange={e => setNewProcessor({ ...newProcessor, name: e.target.value })} />
+                            <input className="border border-slate-300 p-3 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="Business Name" value={newProcessor.businessName} onChange={e => setNewProcessor({ ...newProcessor, businessName: e.target.value })} />
+                            <input className="border border-slate-300 p-3 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="Address" value={newProcessor.address} onChange={e => setNewProcessor({ ...newProcessor, address: e.target.value })} />
+                            <input className="border border-slate-300 p-3 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="District" value={newProcessor.district} onChange={e => setNewProcessor({ ...newProcessor, district: e.target.value })} />
+                            <input className="border border-slate-300 p-3 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="Contact" value={newProcessor.contact} onChange={e => setNewProcessor({ ...newProcessor, contact: e.target.value })} />
+                            <input className="border border-slate-300 p-3 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="Commodities (comma separated)" value={newProcessor.commodities} onChange={e => setNewProcessor({ ...newProcessor, commodities: e.target.value })} />
+                            <input type="date" className="border border-slate-300 p-3 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="Date of Visit" value={newProcessor.date} onChange={e => setNewProcessor({ ...newProcessor, date: e.target.value })} />
+                            <textarea className="border border-slate-300 p-3 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none md:col-span-2" placeholder="Remarks" value={newProcessor.remarks} onChange={e => setNewProcessor({ ...newProcessor, remarks: e.target.value })} />
                         </div>
-                        <div className="space-x-4">
-                            {editingId && (
-                                <button
-                                    className="bg-slate-500 text-white px-6 py-2.5 rounded-lg hover:bg-slate-600 transition-colors font-medium"
-                                    onClick={() => { setEditingId(null); setNewFarmer({ name: "", address: "", contact: "", commodities: "" }); }}
-                                >
-                                    Cancel
-                                </button>
-                            )}
+                        <div className="mt-8 space-x-4 flex justify-end">
+                            <button className="bg-slate-500 text-white px-6 py-2.5 rounded-lg hover:bg-slate-600 transition-colors font-medium" onClick={() => setShowAgroForm(false)}>Cancel</button>
+                            <button className="bg-emerald-600 text-white px-6 py-2.5 rounded-lg hover:bg-emerald-700 shadow-md transition-colors font-medium" onClick={handleAddAgroProcessor}>Save Agro Processor</button>
+                        </div>
+                    </div>
+                )
+            }
+
+            {
+                (showFarmerForm || editingId) && (
+                    <div className="mb-8 p-6 border border-slate-200 rounded-xl shadow-lg bg-white">
+                        <div className="flex justify-between items-center mb-6">
+                            <h2 className="text-2xl font-bold text-slate-800">{editingId ? "Edit Farmer" : "Add New Farmer"}</h2>
+                            <button
+                                className="text-slate-400 hover:text-slate-600"
+                                onClick={() => { setShowFarmerForm(false); setEditingId(null); setNewFarmer({ name: "", address: "", contact: "", commodities: "" }); }}
+                            >
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                            </button>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <input
+                                className="border border-slate-300 p-3 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
+                                placeholder="Name"
+                                value={newFarmer.name}
+                                onChange={e => setNewFarmer({ ...newFarmer, name: e.target.value })}
+                            />
+                            <input
+                                className="border border-slate-300 p-3 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
+                                placeholder="Address"
+                                value={newFarmer.address}
+                                onChange={e => setNewFarmer({ ...newFarmer, address: e.target.value })}
+                            />
+                            <input
+                                className="border border-slate-300 p-3 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
+                                placeholder="Contact"
+                                value={newFarmer.contact}
+                                onChange={e => setNewFarmer({ ...newFarmer, contact: e.target.value })}
+                            />
+                            <input
+                                className="border border-slate-300 p-3 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
+                                placeholder="Commodities (comma separated)"
+                                value={newFarmer.commodities}
+                                onChange={e => setNewFarmer({ ...newFarmer, commodities: e.target.value })}
+                            />
+                        </div>
+                        <div className="mt-8 flex justify-end space-x-4">
+                            <button
+                                className="bg-slate-500 text-white px-6 py-2.5 rounded-lg hover:bg-slate-600 transition-colors font-medium"
+                                onClick={() => { setShowFarmerForm(false); setEditingId(null); setNewFarmer({ name: "", address: "", contact: "", commodities: "" }); }}
+                            >
+                                Cancel
+                            </button>
                             <button
                                 className="bg-blue-600 text-white px-6 py-2.5 rounded-lg hover:bg-blue-700 shadow-md transition-all font-medium"
-                                onClick={editingId ? () => handleUpdate(editingId) : handleAdd}
+                                onClick={editingId ? () => handleUpdate(editingId!) : handleAdd}
                             >
                                 {editingId ? "Update Farmer" : "Add Farmer"}
                             </button>
                         </div>
                     </div>
-                </div>
-            )}
+                )
+            }
+
+            <div className="mb-4 flex items-center space-x-2">
+                <h3 className="text-lg font-bold text-slate-800">
+                    {activeTab === "farmers" ? "Farmers List" : "Agro Processors List"}
+                </h3>
+                <span className="text-xs font-medium px-2 py-0.5 rounded bg-slate-200 text-slate-600 uppercase tracking-wider">
+                    {activeTab === "farmers" ? "Farmers" : "Agro Processors"}
+                </span>
+            </div>
 
             <div className="bg-white rounded-xl shadow-lg overflow-hidden border border-slate-200">
                 <table className="w-full border-collapse">
@@ -339,29 +635,59 @@ export default function FarmersPage() {
                         </tr>
                     </thead>
                     <tbody>
-                        {farmers?.map(farmer => (
-                            <tr key={farmer._id} className="border-b hover:bg-slate-50 transition-colors">
-                                <td className="p-4 text-slate-700 font-mono text-xs">{farmer.ref}</td>
-                                <td className="p-4 text-slate-700 font-medium">{farmer.name}</td>
-                                <td className="p-4 text-slate-700">{farmer.district}</td>
-                                <td className="p-4 text-slate-700">{farmer.address}</td>
-                                <td className="p-4 text-slate-700">{farmer.contact}</td>
-                                <td className="p-4 text-slate-700 text-sm">
-                                    <span className={`px-2 py-1 rounded-full text-xs ${farmer.status?.toLowerCase().includes("active") ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-800"}`}>
-                                        {farmer.status || "-"}
-                                    </span>
-                                </td>
-                                <td className="p-4 text-slate-700">{farmer.commodities.slice(0, 3).join(", ")}{farmer.commodities.length > 3 ? "..." : ""}</td>
-                                <td className="p-4">
-                                    <button className="text-indigo-600 hover:text-indigo-800 mr-4 font-medium" onClick={() => startEdit(farmer)}>Edit</button>
-                                    <button className="text-red-500 hover:text-red-700 font-medium" onClick={() => handleDelete(farmer._id)}>Delete</button>
-                                </td>
-                            </tr>
-                        ))}
+                        {activeTab === "farmers" ? (
+                            filteredFarmers?.map(farmer => (
+                                <tr key={farmer._id} className="border-b hover:bg-slate-50 transition-colors">
+                                    <td className="p-4 text-slate-700 font-mono text-xs">{farmer.ref}</td>
+                                    <td className="p-4 text-slate-700 font-medium">{farmer.name}</td>
+                                    <td className="p-4 text-slate-700">{farmer.district}</td>
+                                    <td className="p-4 text-slate-700">{farmer.address}</td>
+                                    <td className="p-4 text-slate-700">{farmer.contact}</td>
+                                    <td className="p-4 text-slate-700 text-sm">
+                                        <span className={`px-2 py-1 rounded-full text-xs ${farmer.status?.toLowerCase().includes("active") ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-800"}`}>
+                                            {farmer.status || "-"}
+                                        </span>
+                                    </td>
+                                    <td className="p-4 text-slate-700">{farmer.commodities.slice(0, 3).join(", ")}{farmer.commodities.length > 3 ? "..." : ""}</td>
+                                    <td className="p-4">
+                                        <button className="text-indigo-600 hover:text-indigo-800 mr-4 font-medium" onClick={() => startEdit(farmer)}>Edit</button>
+                                        <button className="text-red-500 hover:text-red-700 font-medium" onClick={() => handleDelete(farmer._id)}>Delete</button>
+                                    </td>
+                                </tr>
+                            ))
+                        ) : (
+                            agroProcessors?.map(processor => (
+                                <tr key={processor._id} className="border-b hover:bg-indigo-50 transition-colors">
+                                    <td className="p-4 text-slate-700 font-mono text-xs">{processor.ref || "-"}</td>
+                                    <td className="p-4 text-slate-700 font-medium">{processor.businessName || processor.name}</td>
+                                    <td className="p-4 text-slate-700">{processor.district}</td>
+                                    <td className="p-4 text-slate-700">{processor.address}</td>
+                                    <td className="p-4 text-slate-700">{processor.contact}</td>
+                                    <td className="p-4 text-slate-700 text-sm">
+                                        <span className={`px-2 py-1 rounded-full text-xs ${processor.status?.toLowerCase().includes("active") ? "bg-indigo-100 text-indigo-800" : "bg-gray-100 text-gray-800"}`}>
+                                            {processor.status || "Importer"}
+                                        </span>
+                                    </td>
+                                    <td className="p-4 text-slate-700">{processor.commodities.slice(0, 3).join(", ")}{processor.commodities.length > 3 ? "..." : ""}</td>
+                                    <td className="p-4">
+                                        <button className="text-indigo-600 hover:text-indigo-800 mr-4 font-medium" onClick={() => {
+                                            // Optional: Add edit logic for processors if needed
+                                            alert("Edit logic for processors can be added here similar to farmers.");
+                                        }}>Edit</button>
+                                        <button className="text-red-500 hover:text-red-700 font-medium" onClick={async () => {
+                                            if (confirm("Delete this agro processor?")) {
+                                                // Assuming a deleteMutation exists for processors too, if not we'd need to add it
+                                                // For now, let's keep it consistent
+                                                alert("Delete mutation for processors would be called here.");
+                                            }
+                                        }}>Delete</button>
+                                    </td>
+                                </tr>
+                            ))
+                        )}
                     </tbody>
                 </table>
             </div>
-        </div>
+        </div >
     );
-
 }
