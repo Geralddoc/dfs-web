@@ -249,33 +249,41 @@ export default function FarmersPage() {
 
                 const processorsToAdd = sheetData.map((row: any) => {
                     const findValue = (patterns: string[]) => {
-                        const entry = Object.entries(row).find(([key]) => {
-                            const k = key.trim().toLowerCase();
-                            return patterns.some(p => k.includes(p.toLowerCase()));
-                        });
+                        const entries = Object.entries(row);
+                        // Prioritize exact match
+                        let entry = entries.find(([key]) => patterns.includes(key.trim().toLowerCase()));
+                        // Fallback to partial match
+                        if (!entry) {
+                            entry = entries.find(([key]) => {
+                                const k = key.trim().toLowerCase();
+                                return patterns.some(p => k.includes(p.toLowerCase()));
+                            });
+                        }
                         return entry ? entry[1] : undefined;
                     };
 
-                    const name = (findValue(["name"]) || "").toString();
-                    const bizName = (findValue(["business name", "bus name", "businessname", "company"]) || name).toString();
+                    const name = (findValue(["name", "business", "company", "farmer", "processor", "entity"]) || "").toString();
+                    const bizName = (findValue(["business name", "bus name", "businessname", "company", "entity name"]) || name).toString();
 
                     return {
                         name: name,
                         businessName: bizName,
-                        address: (findValue(["address", "location"]) || "").toString(),
-                        contact: (findValue(["phone", "contact", "mobile", "tel"]) || "").toString(),
-                        district: (findValue(["district"]) || "").toString(),
-                        commodities: (findValue(["commodities", "crops", "products"]) || "").toString().split(",").map((c: string) => c.trim()).filter((c: string) => c),
-                        ref: (findValue(["ref", "id", "code"]) || "").toString(),
-                        quantities: (findValue(["quantities", "amount", "volume"]) || "").toString(),
-                        email: (findValue(["email"]) || "").toString(),
-                        dateOfVisit: excelDateToJSDate(findValue(["visit", "date"])),
-                        status: (findValue(["status"]) || "").toString(),
-                        remarks: (findValue(["remarks", "notes", "comment"]) || "").toString(),
+                        address: (findValue(["address", "location", "village", "place", "business address"]) || "").toString(),
+                        contact: (findValue(["phone", "contact", "mobile", "tel", "cell", "phone#", "phone #"]) || "").toString(),
+                        district: (findValue(["district", "parish", "region"]) || "").toString(),
+                        commodities: (findValue(["commodities", "crops", "products", "items", "produce"]) || "").toString().split(",").map((c: string) => c.trim()).filter((c: string) => c),
+                        ref: (findValue(["ref", "id", "code", "no.", "ref#", "ref #"]) || "").toString(),
+                        quantities: (findValue(["quantities", "amount", "volume", "qty"]) || "").toString(),
+                        email: (findValue(["email", "e-mail", "mail"]) || "").toString(),
+                        dateOfVisit: excelDateToJSDate(findValue(["visit", "date", "date of visit"])),
+                        status: (findValue(["status", "current", "active", "current status"]) || "").toString(),
+                        remarks: (findValue(["remarks", "notes", "comment", "info"]) || "").toString(),
                     };
                 }).filter(p => {
                     const n = p.name.trim();
-                    if (!n || n.length < 2 || n.toLowerCase() === 'name') return false;
+                    if (!n || n.length < 2) return false;
+                    const nLower = n.toLowerCase();
+                    if (nLower === 'name' || nLower === 'farmer name' || nLower === 'business name') return false;
                     return true;
                 });
 
@@ -318,15 +326,15 @@ export default function FarmersPage() {
         reader.onload = async (evt) => {
             try {
                 const bstr = evt.target?.result;
-                const wb = XLSX.read(bstr, { type: "binary" });
+                const wb = XLSX.read(bstr, { type: "array" });
                 const farmersToAdd: any[] = [];
                 let skippedCount = 0;
 
                 // Iterate through all sheets to find farmers
                 wb.SheetNames.forEach(sheetName => {
                     const sheetUpper = sheetName.trim().toUpperCase();
-                    // Skip Agro Processor and Statistics sheets
-                    if (sheetUpper.includes("AGRO") || sheetUpper.includes("STATISTIC") || sheetUpper.includes("SUMMARY")) {
+                    // Skip obvious non-data sheets
+                    if (sheetUpper.includes("STATISTIC") || sheetUpper.includes("SUMMARY") || sheetUpper.includes("DASHBOARD")) {
                         console.log(`Skipping sheet: ${sheetName}`);
                         return;
                     }
@@ -335,16 +343,22 @@ export default function FarmersPage() {
                     const data = XLSX.utils.sheet_to_json(ws);
                     console.log(`Import: Processing sheet "${sheetName}" with ${data.length} raw rows`);
 
-                    // Re-read with offset if needed to find headers
+                    // Improved header detection
                     let sheetData = data;
                     let headerFound = false;
-                    for (let i = 0; i < Math.min(data.length, 10); i++) {
+                    for (let i = 0; i < Math.min(data.length, 15); i++) {
                         const row: any = data[i];
-                        if (row && Object.values(row).some(v => v?.toString().toLowerCase().includes("name"))) {
-                            console.log(`Import: Found potential header at row ${i}`);
-                            sheetData = XLSX.utils.sheet_to_json(ws, { range: i });
-                            headerFound = true;
-                            break;
+                        if (row) {
+                            const rowValues = Object.values(row).map(v => v?.toString().toLowerCase() || "");
+                            const matches = rowValues.some(v =>
+                                v.includes("name") || v.includes("farmer") || v.includes("ref") || v.includes("id") || v.includes("district")
+                            );
+                            if (matches) {
+                                console.log(`Import: Found potential header at row ${i}`);
+                                sheetData = XLSX.utils.sheet_to_json(ws, { range: i });
+                                headerFound = true;
+                                break;
+                            }
                         }
                     }
 
@@ -362,19 +376,25 @@ export default function FarmersPage() {
 
                         const sheetFarmers = sheetData.map((row: any) => {
                             const findValue = (patterns: string[]) => {
-                                const entry = Object.entries(row).find(([key]) => {
-                                    const k = key.trim().toLowerCase();
-                                    return patterns.some(p => k.includes(p.toLowerCase()));
-                                });
+                                const entries = Object.entries(row);
+                                // Prioritize exact match
+                                let entry = entries.find(([key]) => patterns.includes(key.trim().toLowerCase()));
+                                // Fallback to partial match if no exact match found
+                                if (!entry) {
+                                    entry = entries.find(([key]) => {
+                                        const k = key.trim().toLowerCase();
+                                        return patterns.some(p => k.includes(p.toLowerCase()));
+                                    });
+                                }
                                 return entry ? entry[1] : undefined;
                             };
 
-                            const name = (findValue(["name"]) || "").toString();
-                            const address = (findValue(["address", "location"]) || "").toString();
-                            const district = (findValue(["district"]) || sheetName.trim()).toString();
-                            const contact = (findValue(["contact", "phone", "mobile", "tel"]) || "").toString();
-                            const commoditiesRaw = (findValue(["commodities", "crops", "products"]) || "").toString();
-                            const ref = (findValue(["ref", "id", "code"]) || "").toString();
+                            const name = (findValue(["name", "farmer", "business name", "bus name", "businessname", "company", "farmer name", "entity"]) || "").toString();
+                            const address = (findValue(["address", "location", "village", "place", "business address"]) || "").toString();
+                            const district = (findValue(["district", "parish", "region"]) || sheetName.trim()).toString();
+                            const contact = (findValue(["contact", "phone", "mobile", "tel", "cell", "phone#", "phone #"]) || "").toString();
+                            const commoditiesRaw = (findValue(["commodities", "crops", "products", "items", "produce"]) || "").toString();
+                            const ref = (findValue(["ref", "id", "code", "no.", "ref#", "ref #"]) || "").toString();
 
                             return {
                                 name,
@@ -383,14 +403,17 @@ export default function FarmersPage() {
                                 district,
                                 commodities: commoditiesRaw.split(",").map(c => c.trim()).filter(c => c),
                                 ref,
-                                email: (findValue(["email"]) || "").toString(),
-                                quantities: (findValue(["quantities", "amount"]) || "").toString(),
-                                dateOfVisit: excelDateToJSDate(findValue(["visit", "date"])),
-                                status: (findValue(["status"]) || "").toString(),
+                                email: (findValue(["email", "e-mail", "mail"]) || "").toString(),
+                                quantities: (findValue(["quantities", "amount", "volume", "qty"]) || "").toString(),
+                                dateOfVisit: excelDateToJSDate(findValue(["visit", "date", "date of visit"])),
+                                status: (findValue(["status", "current", "active", "current status"]) || "").toString(),
                             };
                         }).filter(f => {
                             const n = f.name.trim();
-                            if (!n || n.length < 2 || n.toLowerCase() === 'name') return false;
+                            if (!n || n.length < 2) return false;
+                            const nLower = n.toLowerCase();
+                            // Skip if it looks like a header row residue
+                            if (nLower === 'name' || nLower === 'farmer name' || nLower === 'business name') return false;
                             return true;
                         });
 
@@ -402,7 +425,10 @@ export default function FarmersPage() {
                 console.log(`Import: Total Farmers collected: ${farmersToAdd.length}`);
 
                 if (farmersToAdd.length === 0) {
-                    alert(`No valid farmers found in file.\nSearched sheets: ${wb.SheetNames.join(", ")}.\nMake sure your columns have headers like 'Name', 'Address', etc.`);
+                    const sampleHeaders = farmersToAdd.length === 0 && wb.SheetNames.length > 0 ?
+                        Object.keys(XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]])[0] || {}).join(", ") : "None found";
+
+                    alert(`IMPORT DIAGNOSTIC:\n- Zero records found.\n- Detected headers: ${sampleHeaders}\n- Check if your name column is one of: Name, Farmer, Business.\n- Searched ${wb.SheetNames.length} sheets.`);
                     setIsImporting(false);
                     return;
                 }
