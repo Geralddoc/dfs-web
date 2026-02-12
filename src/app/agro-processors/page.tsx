@@ -114,11 +114,29 @@ export default function AgroProcessorsPage() {
     };
 
     const handleAdd = async () => {
+        if (!newProcessor.name.trim()) {
+            alert("Name is required.");
+            return;
+        }
+        if (!newProcessor.district.trim()) {
+            alert("District is required.");
+            return;
+        }
+        if (!newProcessor.address.trim()) {
+            alert("Address is required.");
+            return;
+        }
+        if (!newProcessor.contact.trim()) {
+            alert("Contact is required.");
+            return;
+        }
+
         await addProcessor({
             ...newProcessor,
-            commodities: newProcessor.commodities.split(",").map(c => c.trim()),
+            commodities: newProcessor.commodities.split(",").map(c => c.trim()).filter(c => c !== ""),
         });
         setNewProcessor({ name: "", businessName: "", address: "", contact: "", district: "", commodities: "" });
+        alert("Agro Processor added successfully!");
     };
 
     const handleUpdate = async (id: Id<"agroProcessors">) => {
@@ -163,103 +181,116 @@ export default function AgroProcessorsPage() {
                 if (!data) throw new Error("Could not read file data");
 
                 const wb = XLSX.read(data, { type: "array" });
+                const allProcessorsToAdd: any[] = [];
 
-                console.log("Tailored Import: Scanning sheets...", wb.SheetNames);
-                let sheetName = wb.SheetNames.find(name => name.trim().toLowerCase() === "print by districta agro") ||
-                    wb.SheetNames.find(name => name.trim().toUpperCase().includes("AGRO")) ||
-                    wb.SheetNames[0];
+                console.log("Tailored Agro Import: Scanning ALL sheets...", wb.SheetNames);
 
-                console.log(`Tailored Import: Using sheet "${sheetName}"`);
-                const ws = wb.Sheets[sheetName];
-                const rawRows = XLSX.utils.sheet_to_json(ws);
-                console.log(`Tailored Import: Read ${rawRows.length} raw rows`);
+                for (const sheetName of wb.SheetNames) {
+                    const sheetUpper = sheetName.trim().toUpperCase();
+                    const isAgroSheet = sheetUpper.includes("AGRO") ||
+                        sheetName.toLowerCase().includes("processor") ||
+                        sheetName.toLowerCase() === "print by districta agro";
 
-                let headerRowIndex = -1;
-                if (rawRows.length > 0) {
-                    for (let i = 0; i < Math.min(rawRows.length, 5); i++) {
-                        const row: any = rawRows[i];
-                        const keys = Object.keys(row);
-                        if (keys.some(key => key.trim().toLowerCase().match(/^(no\.|ref|name|business|address|district|phone|email|commodit|quantit|date|status|remark)/i))) {
-                            headerRowIndex = i;
-                            break;
+                    if (!isAgroSheet || sheetUpper.includes("STATISTIC") || sheetUpper.includes("SUMMARY") || sheetUpper.includes("DASHBOARD")) {
+                        continue;
+                    }
+
+                    console.log(`Tailored Agro Import: Processing sheet "${sheetName}"`);
+                    const ws = wb.Sheets[sheetName];
+                    const rawRows = XLSX.utils.sheet_to_json(ws, { header: 1 }) as any[][];
+
+                    let headerRowIndex = -1;
+                    if (rawRows.length > 0) {
+                        for (let i = 0; i < Math.min(rawRows.length, 15); i++) {
+                            const row = rawRows[i];
+                            if (row && row.some(cell => cell && cell.toString().trim().toLowerCase().includes("name"))) {
+                                headerRowIndex = i;
+                                break;
+                            }
                         }
                     }
-                }
 
-                let sheetData = rawRows;
-                if (headerRowIndex > 0) {
-                    console.log(`Tailored Import: Re-parsing with header at index ${headerRowIndex}`);
-                    sheetData = XLSX.utils.sheet_to_json(ws, { range: headerRowIndex });
-                }
-
-                const excelDateToJSDate = (serial: any) => {
-                    if (!serial) return "";
-                    if (typeof serial === "string") return serial;
-                    try {
-                        const utc_days = Math.floor(serial - 25569);
-                        const utc_value = utc_days * 86400;
-                        const date_info = new Date(utc_value * 1000);
-                        return date_info.toLocaleDateString();
-                    } catch (e) {
-                        return serial.toString();
+                    let sheetData: any[] = [];
+                    if (headerRowIndex !== -1) {
+                        sheetData = XLSX.utils.sheet_to_json(ws, { range: headerRowIndex });
+                    } else {
+                        sheetData = XLSX.utils.sheet_to_json(ws);
                     }
-                };
 
-                const processorsToAdd = sheetData.map((row: any) => {
-                    const normalizedRow: any = {};
-                    Object.keys(row).forEach(key => {
-                        normalizedRow[key.trim().toLowerCase()] = row[key];
+                    const excelDateToJSDate = (serial: any) => {
+                        if (!serial) return "";
+                        if (typeof serial === "string") return serial;
+                        try {
+                            const utc_days = Math.floor(serial - 25569);
+                            const utc_value = utc_days * 86400;
+                            const date_info = new Date(utc_value * 1000);
+                            return date_info.toLocaleDateString();
+                        } catch (e) {
+                            return serial.toString();
+                        }
+                    };
+
+                    const processorsFromSheet = sheetData.map((row: any) => {
+                        const findValue = (patterns: string[]) => {
+                            const entries = Object.entries(row);
+                            let entry = entries.find(([key]) => patterns.includes(key.trim().toLowerCase()));
+                            if (!entry) {
+                                entry = entries.find(([key]) => {
+                                    const k = key.trim().toLowerCase();
+                                    return patterns.some(p => k.includes(p.toLowerCase()));
+                                });
+                            }
+                            return entry ? entry[1] : undefined;
+                        };
+
+                        const name = (findValue(["name", "business", "company", "farmer", "processor", "entity"]) || "").toString();
+                        const bizName = (findValue(["business name", "bus name", "businessname", "company", "entity name"]) || name).toString();
+
+                        return {
+                            name: name,
+                            businessName: bizName,
+                            address: (findValue(["address", "location", "village", "place", "business address"]) || "").toString(),
+                            contact: (findValue(["phone", "contact", "mobile", "tel", "cell", "phone#", "phone #"]) || "").toString(),
+                            district: (findValue(["district", "parish", "region"]) || sheetName.trim()).toString(),
+                            commodities: (findValue(["commodities", "crops", "products", "items", "produce"]) || "").toString().split(",").map((c: string) => c.trim()).filter((c: string) => c),
+                            ref: (findValue(["ref", "id", "code", "no.", "ref#", "ref #"]) || "").toString(),
+                            quantities: (findValue(["quantities", "amount", "volume", "qty"]) || "").toString(),
+                            email: (findValue(["email", "e-mail", "mail"]) || "").toString(),
+                            dateOfVisit: excelDateToJSDate(findValue(["visit", "date", "date of visit"])),
+                            status: (findValue(["status", "current", "active", "current status"]) || "").toString(),
+                            remarks: (findValue(["remarks", "notes", "comment", "info"]) || "").toString(),
+                        };
+                    }).filter(p => {
+                        const n = p.name.trim();
+                        if (!n || n.length < 2) return false;
+                        const nLower = n.toLowerCase();
+                        if (nLower === 'name' || nLower === 'farmer name' || nLower === 'business name') return false;
+                        return true;
                     });
 
-                    const name = (normalizedRow["business name"] || normalizedRow["businessname"] || normalizedRow["name"] || "").toString();
+                    console.log(`Sheet "${sheetName}": Found ${processorsFromSheet.length} processors`);
+                    allProcessorsToAdd.push(...processorsFromSheet);
+                }
 
-                    return {
-                        name: name,
-                        businessName: (normalizedRow["business name"] || normalizedRow["businessname"] || name).toString(),
-                        address: (normalizedRow["business address"] || normalizedRow["address"] || "").toString(),
-                        contact: (normalizedRow["phone#"] || normalizedRow["phone #"] || normalizedRow["contact"] || "").toString(),
-                        district: (normalizedRow["district"] || "").toString(),
-                        commodities: (normalizedRow["commodities"] || "").toString().split(",").map((c: string) => c.trim()).filter((c: string) => c),
-                        ref: (normalizedRow["ref#"] || normalizedRow["ref"] || "").toString(),
-                        quantities: (normalizedRow["quantities"] || "").toString(),
-                        email: (normalizedRow["email"] || "").toString(),
-                        dateOfVisit: excelDateToJSDate(normalizedRow["date of visit"]),
-                        status: (normalizedRow["current status"] || normalizedRow["status"] || "").toString(),
-                        remarks: (normalizedRow["remarks"] || "").toString(),
-                    };
-                }).filter(p => {
-                    const nameStr = p.name ? p.name.toString().trim() : '';
-                    return nameStr &&
-                        nameStr.toLowerCase() !== 'name' &&
-                        nameStr.toLowerCase() !== 'no.' &&
-                        nameStr.toLowerCase() !== 'business name' &&
-                        nameStr.length > 2;
-                });
-
-                console.log(`Tailored Import: Found ${processorsToAdd.length} valid processors after filtering`);
-
-                if (processorsToAdd.length === 0) {
-                    alert("No valid agro-processors found in the tailored import mapping.");
+                if (allProcessorsToAdd.length === 0) {
+                    alert("No valid agro-processors found. Make sure headers contain 'Name', 'Business Name', 'District', etc.");
                     setIsImporting(false);
                     return;
                 }
 
-                if (confirm(`Tailored import found ${processorsToAdd.length} processors. Proceed?`)) {
+                if (confirm(`Import Agro found ${allProcessorsToAdd.length} processors across sheets. Proceed?`)) {
                     const BATCH_SIZE = 50;
-                    const allIds = [];
-                    for (let i = 0; i < processorsToAdd.length; i += BATCH_SIZE) {
-                        const batch = processorsToAdd.slice(i, i + BATCH_SIZE);
-                        console.log(`Tailored Import: Sending batch ${i / BATCH_SIZE + 1}...`);
+                    let totalImported = 0;
+                    for (let i = 0; i < allProcessorsToAdd.length; i += BATCH_SIZE) {
+                        const batch = allProcessorsToAdd.slice(i, i + BATCH_SIZE);
                         const batchIds = await bulkAddProcessors({ processors: batch });
-                        allIds.push(...batchIds);
+                        totalImported += batchIds.length;
                     }
-                    setLastImportedIds(allIds);
-                    alert(`Successfully imported ${allIds.length} tailored records.`);
-                    console.log("Tailored Import: Success!");
+                    alert(`Successfully imported ${totalImported} agro-processor records.`);
                 }
             } catch (error) {
-                console.error("Tailored import failed:", error);
-                alert(`Tailored import failed: ${error instanceof Error ? error.message : String(error)}`);
+                console.error("Import failed:", error);
+                alert(`Import failed: ${error instanceof Error ? error.message : String(error)}`);
             } finally {
                 setIsImporting(false);
                 if (tailoredFileInputRef.current) tailoredFileInputRef.current.value = "";
@@ -593,7 +624,7 @@ export default function AgroProcessorsPage() {
                     onClick={() => tailoredFileInputRef.current?.click()}
                     disabled={isImporting}
                 >
-                    {isImporting ? "Importing..." : "Agro Import"}
+                    {isImporting ? "Importing..." : "Import Agro Excel"}
                 </button>
                 {lastImportedIds.length > 0 && (
                     <button
