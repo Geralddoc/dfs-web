@@ -11,6 +11,7 @@ interface ShareDialogProps {
 export function ShareDialog({ isOpen, onClose }: ShareDialogProps) {
     const [localIp, setLocalIp] = useState<string>("localhost");
     const [port, setPort] = useState<string>("3000");
+    const [shareMode, setShareMode] = useState<"global" | "local">("global");
     const [copied, setCopied] = useState(false);
 
     useEffect(() => {
@@ -32,11 +33,13 @@ export function ShareDialog({ isOpen, onClose }: ShareDialogProps) {
 
     if (!isOpen) return null;
 
+    const globalUrl = typeof window !== "undefined" ? `${window.location.origin}/viewer` : "";
     const viewerUrl = `http://${localIp}:${port}/viewer`;
-    const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(viewerUrl)}`;
+    const activeUrl = shareMode === "global" ? globalUrl : viewerUrl;
+    const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(activeUrl)}`;
 
     const handleCopy = () => {
-        navigator.clipboard.writeText(viewerUrl);
+        navigator.clipboard.writeText(activeUrl);
         setCopied(true);
         setTimeout(() => setCopied(false), 2000);
     };
@@ -60,27 +63,42 @@ export function ShareDialog({ isOpen, onClose }: ShareDialogProps) {
                     </button>
                 </div>
 
-                <div className="p-8 space-y-8">
+                <div className="p-8 space-y-6">
+                    {/* Mode Toggle */}
+                    <div className="flex bg-slate-100 p-1 rounded-xl">
+                        <button
+                            onClick={() => setShareMode("global")}
+                            className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${shareMode === "global" ? "bg-white text-indigo-600 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}
+                        >
+                            WORLDWIDE WEB
+                        </button>
+                        <button
+                            onClick={() => setShareMode("local")}
+                            className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${shareMode === "local" ? "bg-white text-purple-600 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}
+                        >
+                            HOME WI-FI
+                        </button>
+                    </div>
+
                     {/* QR Code Section */}
                     <div className="flex flex-col items-center space-y-4">
-                        <div className="bg-slate-50 p-4 rounded-xl border-2 border-dashed border-slate-200">
+                        <div className="bg-white p-4 rounded-xl border-2 border-dashed border-slate-200 shadow-inner">
                             <Image
                                 src={qrCodeUrl}
                                 alt="QR Code"
                                 width={200}
                                 height={200}
-                                className="w-48 h-48 rounded-lg shadow-sm bg-white"
+                                className="w-44 h-44 rounded-lg shadow-sm"
                                 unoptimized
                             />
                         </div>
-                        <p className="text-sm text-slate-500 font-medium text-center">
-                            Scan this QR code with any phone on <br />
-                            <span className="text-purple-600 font-bold">the same Wi-Fi network</span>
-                        </p>
-                    </div>
-
-                    <div className="divider flex items-center text-slate-300 text-xs font-bold uppercase tracking-widest before:content-[''] before:flex-1 before:border-b before:border-slate-100 before:mr-4 after:content-[''] after:flex-1 after:border-b after:border-slate-100 after:ml-4">
-                        OR COPY LINK
+                        <div className="text-center">
+                            <p className="text-sm text-slate-600 font-medium">
+                                {shareMode === "global"
+                                    ? "Scan to view from anywhere in the world"
+                                    : "Scan to view from another device on your Wi-Fi"}
+                            </p>
+                        </div>
                     </div>
 
                     {/* URL Section */}
@@ -89,35 +107,45 @@ export function ShareDialog({ isOpen, onClose }: ShareDialogProps) {
                             <input
                                 type="text"
                                 readOnly
-                                value={viewerUrl}
-                                className="bg-transparent border-none text-sm text-slate-600 flex-1 outline-none font-mono"
+                                value={activeUrl}
+                                className="bg-transparent border-none text-[10px] text-slate-500 flex-1 outline-none font-mono"
                             />
                             <button
                                 onClick={handleCopy}
-                                className={`${copied ? "bg-emerald-500" : "bg-purple-600"} text-white px-4 py-1.5 rounded-md text-sm font-bold transition-all hover:scale-105 active:scale-95`}
+                                className={`${copied ? "bg-emerald-500" : (shareMode === "global" ? "bg-indigo-600" : "bg-purple-600")} text-white px-4 py-1.5 rounded-md text-xs font-bold transition-all hover:scale-105 active:scale-95`}
                             >
                                 {copied ? "COPIED!" : "COPY"}
                             </button>
                         </div>
-                        <p className="text-[10px] text-slate-400 italic">
-                            Tip: This link uses your computer&apos;s network IP({localIp}) to ensure mobile devices can reach it.
-                        </p>
                     </div>
 
-                    {/* Troubleshooting Section */}
-                    <div className="bg-amber-50 p-4 rounded-xl border border-amber-100">
-                        <h4 className="text-xs font-bold text-amber-800 flex items-center">
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 mr-1" viewBox="0 0 20 20" fill="currentColor">
-                                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-                            </svg>
-                            CAN&apos;T CONNECT?
-                        </h4>
-                        <ul className="text-[10px] text-amber-700 mt-2 space-y-1 ml-4 list-disc">
-                            <li>Ensure phone is on <span className="font-bold">Wi-Fi</span> (not mobile data).</li>
-                            <li>Set Windows Wi-Fi to <span className="font-bold">&quot;Private&quot;</span> in Settings.</li>
-                            <li>Verify your computer IP is <span className="font-bold">{localIp}</span>.</li>
-                        </ul>
-                    </div>
+                    {/* Context/Tips */}
+                    {shareMode === "local" ? (
+                        <div className="bg-amber-50 p-4 rounded-xl border border-amber-100">
+                            <h4 className="text-[10px] font-bold text-amber-800 flex items-center uppercase tracking-wider">
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 mr-1" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                                </svg>
+                                Wi-Fi Mode Tips
+                            </h4>
+                            <ul className="text-[10px] text-amber-700 mt-2 space-y-1 ml-4 list-disc">
+                                <li>Ensure phone is on <span className="font-bold">Wi-Fi</span> (not mobile data).</li>
+                                <li>Local IP detected: <span className="font-bold">{localIp}</span>.</li>
+                            </ul>
+                        </div>
+                    ) : (
+                        <div className="bg-indigo-50 p-4 rounded-xl border border-indigo-100">
+                            <h4 className="text-[10px] font-bold text-indigo-800 flex items-center uppercase tracking-wider">
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 mr-1" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                                </svg>
+                                Global Mode Info
+                            </h4>
+                            <p className="text-[10px] text-indigo-700 mt-1">
+                                This link works via the internet. Perfect for sharing with remote staff or partners.
+                            </p>
+                        </div>
+                    )}
                 </div>
 
                 {/* Footer */}
