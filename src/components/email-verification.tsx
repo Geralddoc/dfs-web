@@ -31,7 +31,7 @@ export function EmailVerification() {
         <CardContent>
           <div className="space-y-4">
             <p className="text-sm text-gray-600">
-              We've sent a verification link to your email address. Please check your inbox and click the link to verify your email.
+              We&apos;ve sent a verification link to your email address. Please check your inbox and click the link to verify your email.
             </p>
             {message && (
               <div className={`p-3 rounded-md ${message.includes('sent') ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>

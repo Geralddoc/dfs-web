@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Image from "next/image";
 
 interface ShareDialogProps {
     isOpen: boolean;
@@ -63,7 +64,14 @@ export function ShareDialog({ isOpen, onClose }: ShareDialogProps) {
                     {/* QR Code Section */}
                     <div className="flex flex-col items-center space-y-4">
                         <div className="bg-slate-50 p-4 rounded-xl border-2 border-dashed border-slate-200">
-                            <img src={qrCodeUrl} alt="QR Code" className="w-48 h-48 rounded-lg shadow-sm bg-white" />
+                            <Image
+                                src={qrCodeUrl}
+                                alt="QR Code"
+                                width={200}
+                                height={200}
+                                className="w-48 h-48 rounded-lg shadow-sm bg-white"
+                                unoptimized
+                            />
                         </div>
                         <p className="text-sm text-slate-500 font-medium text-center">
                             Scan this QR code with any phone on <br />
@@ -92,7 +100,7 @@ export function ShareDialog({ isOpen, onClose }: ShareDialogProps) {
                             </button>
                         </div>
                         <p className="text-[10px] text-slate-400 italic">
-                            Tip: This link uses your computer's network IP({localIp}) to ensure mobile devices can reach it.
+                            Tip: This link uses your computer&apos;s network IP({localIp}) to ensure mobile devices can reach it.
                         </p>
                     </div>
 
@@ -102,11 +110,11 @@ export function ShareDialog({ isOpen, onClose }: ShareDialogProps) {
                             <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 mr-1" viewBox="0 0 20 20" fill="currentColor">
                                 <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
                             </svg>
-                            CAN'T CONNECT?
+                            CAN&apos;T CONNECT?
                         </h4>
                         <ul className="text-[10px] text-amber-700 mt-2 space-y-1 ml-4 list-disc">
                             <li>Ensure phone is on <span className="font-bold">Wi-Fi</span> (not mobile data).</li>
-                            <li>Set Windows Wi-Fi to <span className="font-bold">"Private"</span> in Settings.</li>
+                            <li>Set Windows Wi-Fi to <span className="font-bold">&quot;Private&quot;</span> in Settings.</li>
                             <li>Verify your computer IP is <span className="font-bold">{localIp}</span>.</li>
                         </ul>
                     </div>
