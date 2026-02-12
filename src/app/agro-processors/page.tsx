@@ -34,26 +34,83 @@ export default function AgroProcessorsPage() {
     const [isShareOpen, setIsShareOpen] = useState(false);
 
     // Filtering State
-    const [selectedDistricts, setSelectedDistricts] = useState<string[]>([]);
-    const [selectedCommodities, setSelectedCommodities] = useState<string[]>([]);
+    const [selectedFarmerDistricts, setSelectedFarmerDistricts] = useState<string[]>([]);
+    const [selectedFarmerCommodities, setSelectedFarmerCommodities] = useState<string[]>([]);
+    const [selectedAgroDistricts, setSelectedAgroDistricts] = useState<string[]>([]);
+    const [selectedAgroCommodities, setSelectedAgroCommodities] = useState<string[]>([]);
 
-    // Derived Data for Filters
-    const uniqueDistricts = Array.from(new Set((processors || []).map(p => p.district).filter(Boolean) as string[])).sort();
-    const uniqueCommodities = Array.from(new Set((processors || []).flatMap(p => p.commodities)
+    // Derived Data for Filters (Sanitized and Sorted)
+    const uniqueFarmerDistricts = Array.from(new Set((farmers || [])
+        .map(f => f.district?.trim())
+        .filter(Boolean) as string[])).sort();
+
+    const uniqueFarmerCommodities = Array.from(new Set((farmers || [])
+        .flatMap(f => f.commodities)
         .map(c => c.trim())
         .filter(c => c && /[a-zA-Z]/.test(c))
     )).sort();
 
-    // Filter Logic
-    const filteredProcessors = processors?.filter(processor => {
-        const matchesDistrict = selectedDistricts.length === 0 || (processor.district && selectedDistricts.includes(processor.district));
-        const matchesCommodity = selectedCommodities.length === 0 || processor.commodities.some(c => selectedCommodities.includes(c));
+    const uniqueAgroDistricts = Array.from(new Set((processors || [])
+        .map(p => p.district?.trim())
+        .filter(Boolean) as string[])).sort();
+
+    const uniqueAgroCommodities = Array.from(new Set((processors || [])
+        .flatMap(p => p.commodities)
+        .map(c => c.trim())
+        .filter(c => c && /[a-zA-Z]/.test(c))
+    )).sort();
+
+    // Count Calculations
+    const farmerDistrictCounts: Record<string, number> = {};
+    farmers?.forEach(f => {
+        const d = f.district?.trim();
+        if (d) farmerDistrictCounts[d] = (farmerDistrictCounts[d] || 0) + 1;
+    });
+
+    const farmerCommodityCounts: Record<string, number> = {};
+    farmers?.forEach(f => {
+        f.commodities.forEach(c => {
+            const clean = c.trim();
+            if (clean) farmerCommodityCounts[clean] = (farmerCommodityCounts[clean] || 0) + 1;
+        });
+    });
+
+    const agroDistrictCounts: Record<string, number> = {};
+    processors?.forEach(p => {
+        const d = p.district?.trim();
+        if (d) agroDistrictCounts[d] = (agroDistrictCounts[d] || 0) + 1;
+    });
+
+    const agroCommodityCounts: Record<string, number> = {};
+    processors?.forEach(p => {
+        p.commodities.forEach(c => {
+            const clean = c.trim();
+            if (clean) agroCommodityCounts[clean] = (agroCommodityCounts[clean] || 0) + 1;
+        });
+    });
+
+    // Filter Logic (Sanitized match)
+    const filteredFarmers = farmers?.filter(farmer => {
+        const matchesDistrict = selectedFarmerDistricts.length === 0 || (farmer.district?.trim() && selectedFarmerDistricts.includes(farmer.district.trim()));
+        const matchesCommodity = selectedFarmerCommodities.length === 0 || farmer.commodities.some(c => selectedFarmerCommodities.includes(c.trim()));
         return matchesDistrict && matchesCommodity;
     });
 
+    const filteredProcessors = processors?.filter(processor => {
+        // Agro-specific filters
+        const matchesAgroDistrict = selectedAgroDistricts.length === 0 || (processor.district?.trim() && selectedAgroDistricts.includes(processor.district.trim()));
+        const matchesAgroCommodity = selectedAgroCommodities.length === 0 || processor.commodities.some(c => selectedAgroCommodities.includes(c.trim()));
+
+        // Farmer correlation filters
+        const matchesFarmerDistrict = selectedFarmerDistricts.length === 0 || (processor.district?.trim() && selectedFarmerDistricts.includes(processor.district.trim()));
+        const matchesFarmerCommodity = selectedFarmerCommodities.length === 0 || processor.commodities.some(c => selectedFarmerCommodities.includes(c.trim()));
+
+        return matchesAgroDistrict && matchesAgroCommodity && matchesFarmerDistrict && matchesFarmerCommodity;
+    });
+
     const handleAiFilter = (filters: { district?: string[], commodities?: string[] }) => {
-        if (filters.district) setSelectedDistricts(filters.district);
-        if (filters.commodities) setSelectedCommodities(filters.commodities);
+        if (filters.district) setSelectedAgroDistricts(filters.district);
+        if (filters.commodities) setSelectedAgroCommodities(filters.commodities);
     };
 
     const handleAdd = async () => {
@@ -401,7 +458,7 @@ export default function AgroProcessorsPage() {
                         ← Back to List
                     </button>
                     <Dashboard
-                        farmers={farmers || []}
+                        farmers={filteredFarmers || []}
                         agroProcessors={filteredProcessors || []}
                         initialType="AgroProcessor"
                     />
@@ -446,32 +503,61 @@ export default function AgroProcessorsPage() {
             </div>
 
             {/* Filter Bar */}
-            <div className="mb-6 flex flex-wrap gap-4 items-center bg-white p-4 rounded-lg shadow-sm border border-slate-200">
-                <span className="text-slate-500 font-medium text-sm">Filter by:</span>
-                <FilterPopover
-                    title="District"
-                    options={uniqueDistricts}
-                    selected={selectedDistricts}
-                    onChange={setSelectedDistricts}
-                />
-                <FilterPopover
-                    title="Commodities"
-                    options={uniqueCommodities}
-                    selected={selectedCommodities}
-                    onChange={setSelectedCommodities}
-                />
+            <div className="mb-6 flex flex-wrap gap-y-4 gap-x-8 items-center bg-white p-4 rounded-lg shadow-sm border border-slate-200">
+                <div className="flex items-center gap-3">
+                    <span className="text-emerald-600 font-bold text-[10px] uppercase tracking-wider">Farmer Filters:</span>
+                    <FilterPopover
+                        title="Farmer Districts"
+                        options={uniqueFarmerDistricts}
+                        selected={selectedFarmerDistricts}
+                        onChange={setSelectedFarmerDistricts}
+                        counts={farmerDistrictCounts}
+                    />
+                    <FilterPopover
+                        title="Farmer Commodities"
+                        options={uniqueFarmerCommodities}
+                        selected={selectedFarmerCommodities}
+                        onChange={setSelectedFarmerCommodities}
+                        counts={farmerCommodityCounts}
+                    />
+                </div>
 
-                {(selectedDistricts.length > 0 || selectedCommodities.length > 0) && (
+                <div className="flex items-center gap-3 border-l pl-8 border-slate-100">
+                    <span className="text-indigo-600 font-bold text-[10px] uppercase tracking-wider">Agro Filters:</span>
+                    <FilterPopover
+                        title="Agro Districts"
+                        options={uniqueAgroDistricts}
+                        selected={selectedAgroDistricts}
+                        onChange={setSelectedAgroDistricts}
+                        counts={agroDistrictCounts}
+                    />
+                    <FilterPopover
+                        title="Agro Commodities"
+                        options={uniqueAgroCommodities}
+                        selected={selectedAgroCommodities}
+                        onChange={setSelectedAgroCommodities}
+                        counts={agroCommodityCounts}
+                    />
+                </div>
+
+                {(selectedFarmerDistricts.length > 0 || selectedFarmerCommodities.length > 0 || selectedAgroDistricts.length > 0 || selectedAgroCommodities.length > 0) && (
                     <button
-                        onClick={() => { setSelectedDistricts([]); setSelectedCommodities([]); }}
+                        onClick={() => {
+                            setSelectedFarmerDistricts([]);
+                            setSelectedFarmerCommodities([]);
+                            setSelectedAgroDistricts([]);
+                            setSelectedAgroCommodities([]);
+                        }}
                         className="text-sm text-red-600 hover:text-red-800 font-medium ml-auto"
                     >
-                        Clear Filters
+                        Clear All Filters
                     </button>
                 )}
-                <div className="ml-auto text-sm text-slate-500">
-                    Showing {filteredProcessors?.length || 0} / {processors?.length || 0} processors
-                </div>
+                {!((selectedFarmerDistricts.length > 0 || selectedFarmerCommodities.length > 0 || selectedAgroDistricts.length > 0 || selectedAgroCommodities.length > 0)) && (
+                    <div className="ml-auto text-sm text-slate-500">
+                        Showing {filteredProcessors?.length || 0} / {processors?.length || 0} processors
+                    </div>
+                )}
             </div>
 
             <AiAssistant

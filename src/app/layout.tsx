@@ -11,8 +11,8 @@ const roboto = Roboto({
 })
 
 export const metadata: Metadata = {
-  title: "The Division of Food Security",
-  description: "Expert ceiling fan repair, maintenance, and installation services. Fast, reliable, and affordable fan solutions for your home and business.",
+  title: "Farmers & Agro-Processors Management",
+  description: "Official portal for managing farmer and agro-processor records for The Division of Food Security.",
 }
 
 export default function RootLayout({

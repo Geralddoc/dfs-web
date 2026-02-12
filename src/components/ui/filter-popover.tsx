@@ -5,9 +5,10 @@ interface FilterPopoverProps {
     options: string[];
     selected: string[];
     onChange: (selected: string[]) => void;
+    counts?: Record<string, number>;
 }
 
-export function FilterPopover({ title, options, selected, onChange }: FilterPopoverProps) {
+export function FilterPopover({ title, options, selected, onChange, counts }: FilterPopoverProps) {
     const [isOpen, setIsOpen] = useState(false);
     const [searchTerm, setSearchTerm] = useState("");
     const wrapperRef = useRef<HTMLDivElement>(null);
@@ -64,6 +65,27 @@ export function FilterPopover({ title, options, selected, onChange }: FilterPopo
                             onChange={(e) => setSearchTerm(e.target.value)}
                         />
                     </div>
+                    <div className="p-2 border-b flex justify-between items-center bg-slate-50">
+                        <button
+                            className="text-xs text-indigo-600 hover:text-indigo-800 font-medium"
+                            onClick={() => {
+                                const allFilteredSelected = filteredOptions.every(opt => selected.includes(opt));
+                                if (allFilteredSelected) {
+                                    // Deselect only the filtered options
+                                    onChange(selected.filter(s => !filteredOptions.includes(s)));
+                                } else {
+                                    // Select all filtered options (plus any already selected outside the filter)
+                                    const newSelected = Array.from(new Set([...selected, ...filteredOptions]));
+                                    onChange(newSelected);
+                                }
+                            }}
+                        >
+                            {filteredOptions.every(opt => selected.includes(opt)) ? "Deselect All" : "Select All"}
+                        </button>
+                        <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">
+                            {filteredOptions.length} Options
+                        </span>
+                    </div>
                     <div className="py-1 max-h-60 overflow-y-auto" role="menu" aria-orientation="vertical" aria-labelledby="options-menu">
                         {filteredOptions.length > 0 ? (
                             filteredOptions.map((option) => (
@@ -79,6 +101,11 @@ export function FilterPopover({ title, options, selected, onChange }: FilterPopo
                                         className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded mr-3"
                                     />
                                     <span className="truncate">{option}</span>
+                                    {counts && counts[option] !== undefined && (
+                                        <span className="ml-auto pl-4 text-[10px] text-slate-400 font-mono">
+                                            ({counts[option]})
+                                        </span>
+                                    )}
                                 </div>
                             ))
                         ) : (
