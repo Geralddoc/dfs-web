@@ -18,8 +18,8 @@ if (!convexUrl) {
 }
 const client = new ConvexHttpClient(convexUrl);
 
-async function importAgroProcessors() {
-    const filename = process.argv[2] || 'agro for antigravity.xlsx';
+async function importFarmers() {
+    const filename = process.argv[2] || 'database for antigravity farmers.xlsx';
 
     console.log(`Reading file: ${filename}`);
 
@@ -29,14 +29,14 @@ async function importAgroProcessors() {
 
         console.log('Available sheets:', workbook.SheetNames);
 
-        // Find a sheet with "agro" in the name, or use the first sheet
+        // Find a sheet with "farm" in the name, or use the first sheet
         let sheetName = workbook.SheetNames.find(name =>
-            name.trim().toLowerCase().includes('agro')
+            name.trim().toLowerCase().includes('farm')
         );
 
         if (!sheetName) {
             sheetName = workbook.SheetNames[0];
-            console.log(`No 'agro' sheet found, using first sheet: ${sheetName}`);
+            console.log(`No 'farmer' sheet found, using first sheet: ${sheetName}`);
         } else {
             console.log(`Using sheet: ${sheetName}`);
         }
@@ -52,8 +52,8 @@ async function importAgroProcessors() {
         }
 
         // Clear existing data
-        console.log('Clearing existing agro-processors...');
-        const deletedCount = await client.mutation('agroProcessors:deleteAll', {});
+        console.log('Clearing existing farmers...');
+        const deletedCount = await client.mutation('farmers:deleteAll', {});
         console.log(`Cleared ${deletedCount} existing records.`);
 
         // Show first row headers
@@ -74,18 +74,17 @@ async function importAgroProcessors() {
         let skipped = 0;
 
         for (const row of data) {
-            // Normalize column names to lowercase
+            // Normalize column names to lowercase and trim
             const normalizedRow = {};
             Object.keys(row).forEach(key => {
                 normalizedRow[key.trim().toLowerCase()] = row[key];
             });
 
-            // Extract processor data
-            const processor = {
-                name: normalizedRow['business name'] || normalizedRow['businessname'] || normalizedRow['name'] || '',
-                businessName: normalizedRow['business name'] || normalizedRow['businessname'] || normalizedRow['name'] || '',
-                address: normalizedRow['address'] || normalizedRow['business address'] || '',
-                contact: (normalizedRow['contact'] || normalizedRow['phone#'] || normalizedRow['phone #'] || '').toString(),
+            // Extract farmer data
+            const farmer = {
+                name: normalizedRow['name'] || '',
+                address: normalizedRow['address'] || '',
+                contact: (normalizedRow['phone #'] || normalizedRow['phone'] || normalizedRow['contact'] || '').toString(),
                 district: normalizedRow['district'] || '',
                 commodities: (normalizedRow['commodities'] || '').toString().split(',').map(c => c.trim()).filter(c => c),
                 ref: (normalizedRow['ref#'] || normalizedRow['ref'] || '').toString(),
@@ -93,16 +92,14 @@ async function importAgroProcessors() {
                 email: (normalizedRow['email'] || '').toString(),
                 dateOfVisit: excelDateToJSDate(normalizedRow['date of visit']),
                 status: normalizedRow['current status'] || normalizedRow['status'] || '',
-                remarks: normalizedRow['remarks'] || '',
             };
 
-            // Only skip if truly empty or a header row
-            const nameStr = processor.name.toString().trim();
-            const isInvalidName = !processor.name ||
+            // Skip if name is empty or looks like a header
+            const nameStr = farmer.name.toString().trim();
+            const isInvalidName = !farmer.name ||
                 nameStr === '' ||
                 nameStr.toLowerCase() === 'name' ||
-                nameStr.toLowerCase() === 'no.' ||
-                nameStr.toLowerCase() === 'business name';
+                nameStr.toLowerCase() === 'no.';
 
             if (isInvalidName) {
                 skipped++;
@@ -112,22 +109,21 @@ async function importAgroProcessors() {
             // Log first few for debugging
             if (imported < 3) {
                 console.log(`\nProcessing record #${imported + 1}:`);
-                console.log(`  Name: ${processor.name}`);
-                console.log(`  Business Name: ${processor.businessName}`);
-                console.log(`  REF: ${processor.ref}`);
-                console.log(`  District: ${processor.district}`);
+                console.log(`  Name: ${farmer.name}`);
+                console.log(`  REF: ${farmer.ref}`);
+                console.log(`  District: ${farmer.district}`);
             }
 
             // Import to Convex
             try {
-                await client.mutation('agroProcessors:addAgroProcessor', processor);
+                await client.mutation('farmers:addFarmer', farmer);
                 imported++;
 
-                if (imported % 10 === 0) {
-                    console.log(`Imported ${imported} processors...`);
+                if (imported % 25 === 0) {
+                    console.log(`Imported ${imported} farmers...`);
                 }
             } catch (error) {
-                console.error(`Error importing ${processor.name}:`, error.message);
+                console.error(`Error importing ${farmer.name}:`, error.message);
                 skipped++;
             }
         }
@@ -144,7 +140,7 @@ async function importAgroProcessors() {
 }
 
 // Run the import
-importAgroProcessors()
+importFarmers()
     .then(() => {
         console.log('Import finished successfully');
         process.exit(0);
