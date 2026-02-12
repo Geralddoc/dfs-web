@@ -119,12 +119,21 @@ export default function FarmersPage() {
 
     // ... existing handlers (handleAdd, handleUpdate, handleDelete, startEdit, agro processor logic, import logic) ...
     const handleAdd = async () => {
-        await addFarmer({
-            ...newFarmer,
-            commodities: newFarmer.commodities.split(",").map(c => c.trim()),
-        });
-        setNewFarmer({ name: "", address: "", contact: "", commodities: "" });
-        setShowFarmerForm(false);
+        try {
+            if (!newFarmer.name.trim() || !newFarmer.address.trim()) {
+                alert("Please enter both Name and Address for the farmer.");
+                return;
+            }
+            await addFarmer({
+                ...newFarmer,
+                commodities: newFarmer.commodities.split(",").map(c => c.trim()).filter(c => c !== ""),
+            });
+            setNewFarmer({ name: "", address: "", contact: "", commodities: "" });
+            setShowFarmerForm(false);
+        } catch (error: any) {
+            console.error("Failed to add farmer:", error);
+            alert(`Error adding farmer: ${error.message || "Unknown error"}`);
+        }
     };
 
     const handleUpdate = async (id: Id<"farmers">) => {
@@ -157,18 +166,27 @@ export default function FarmersPage() {
     });
 
     const handleAddAgroProcessor = async () => {
-        await addAgroProcessor({
-            name: newProcessor.name,
-            businessName: newProcessor.businessName,
-            address: newProcessor.address,
-            contact: newProcessor.contact,
-            district: newProcessor.district,
-            commodities: newProcessor.commodities.split(",").map(c => c.trim()),
-            date: newProcessor.date,
-            remarks: newProcessor.remarks
-        });
-        setShowAgroForm(false);
-        setNewProcessor({ name: "", businessName: "", address: "", contact: "", district: "", commodities: "", date: "", remarks: "" });
+        try {
+            if (!newProcessor.name.trim() || !newProcessor.district.trim()) {
+                alert("Please enter Name and District (required by schema).");
+                return;
+            }
+            await addAgroProcessor({
+                name: newProcessor.name,
+                businessName: newProcessor.businessName,
+                address: newProcessor.address,
+                contact: newProcessor.contact,
+                district: newProcessor.district,
+                commodities: newProcessor.commodities.split(",").map(c => c.trim()).filter(c => c !== ""),
+                date: newProcessor.date,
+                remarks: newProcessor.remarks
+            });
+            setShowAgroForm(false);
+            setNewProcessor({ name: "", businessName: "", address: "", contact: "", district: "", commodities: "", date: "", remarks: "" });
+        } catch (error: any) {
+            console.error("Failed to add agro processor:", error);
+            alert(`Error adding agro processor: ${error.message || "Unknown error"}`);
+        }
     };
 
     const [lastImportedIds, setLastImportedIds] = useState<Id<"farmers">[]>([]);
