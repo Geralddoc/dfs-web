@@ -50,8 +50,8 @@ export default function FarmersPage() {
 
     const uniqueFarmerCommodities = Array.from(new Set((farmers || [])
         .flatMap(f => f.commodities)
-        .map(c => c.trim())
-        .filter(c => c && /[a-zA-Z]/.test(c))
+        .map(commodity => commodity.trim())
+        .filter(commodity => commodity && /[a-zA-Z]/.test(commodity))
     )).sort();
 
     const uniqueAgroDistricts = Array.from(new Set((agroProcessors || [])
@@ -60,8 +60,8 @@ export default function FarmersPage() {
 
     const uniqueAgroCommodities = Array.from(new Set((agroProcessors || [])
         .flatMap(p => p.commodities)
-        .map(c => c.trim())
-        .filter(c => c && /[a-zA-Z]/.test(c))
+        .map(commodity => commodity.trim())
+        .filter(commodity => commodity && /[a-zA-Z]/.test(commodity))
     )).sort();
 
     // Count Calculations
@@ -73,8 +73,8 @@ export default function FarmersPage() {
 
     const farmerCommodityCounts: Record<string, number> = {};
     farmers?.forEach(f => {
-        f.commodities.forEach(c => {
-            const clean = c.trim();
+        f.commodities.forEach(commodity => {
+            const clean = commodity.trim();
             if (clean) farmerCommodityCounts[clean] = (farmerCommodityCounts[clean] || 0) + 1;
         });
     });
@@ -87,8 +87,8 @@ export default function FarmersPage() {
 
     const agroCommodityCounts: Record<string, number> = {};
     agroProcessors?.forEach(p => {
-        p.commodities.forEach(c => {
-            const clean = c.trim();
+        p.commodities.forEach(commodity => {
+            const clean = commodity.trim();
             if (clean) agroCommodityCounts[clean] = (agroCommodityCounts[clean] || 0) + 1;
         });
     });
@@ -135,7 +135,7 @@ export default function FarmersPage() {
 
             await addFarmer({
                 ...newFarmer,
-                commodities: newFarmer.commodities.split(",").map(c => c.trim()).filter(c => c !== ""),
+                commodities: newFarmer.commodities.split(",").map(commodity => commodity.trim()).filter(commodity => commodity !== ""),
             });
             setNewFarmer({ name: "", address: "", contact: "", commodities: "" });
             setShowFarmerForm(false);
@@ -301,7 +301,7 @@ export default function FarmersPage() {
                             address: (findValue(["address", "location", "village", "place", "business address"]) || "").toString(),
                             contact: (findValue(["phone", "contact", "mobile", "tel", "cell", "phone#", "phone #"]) || "").toString(),
                             district: (findValue(["district", "parish", "region"]) || sheetName.trim()).toString(),
-                            commodities: (findValue(["commodities", "crops", "products", "items", "produce"]) || "").toString().split(",").map((c: string) => c.trim()).filter((c: string) => c),
+                            commodities: (findValue(["commodities", "crops", "products", "items", "produce"]) || "").toString().split(",").map((comm: string) => comm.trim()).filter((comm: string) => comm),
                             ref: (findValue(["ref", "id", "code", "no.", "ref#", "ref #"]) || "").toString(),
                             quantities: (findValue(["quantities", "amount", "volume", "qty"]) || "").toString(),
                             email: (findValue(["email", "e-mail", "mail"]) || "").toString(),
