@@ -528,6 +528,13 @@ export default function AgroProcessorsPage() {
                         View Analytics
                     </button>
                     <button
+                        className="bg-emerald-600 text-white px-5 py-2.5 rounded-lg hover:bg-emerald-700 shadow-md transition-all font-medium"
+                        onClick={() => tailoredFileInputRef.current?.click()}
+                        disabled={isImporting}
+                    >
+                        {isImporting ? "Importing..." : "Import Excel"}
+                    </button>
+                    <button
                         className="bg-green-600 text-white px-5 py-2.5 rounded-lg hover:bg-green-700 shadow-md transition-all font-medium"
                         onClick={() => processors && exportToExcel(processors, 'agro_processors_data')}
                     >
@@ -621,20 +628,6 @@ export default function AgroProcessorsPage() {
                     className="hidden"
                     ref={tailoredFileInputRef}
                 />
-                <button
-                    className={`text-white px-5 py-2.5 rounded-lg shadow-md transition-all font-medium ${isImporting ? "bg-emerald-400 cursor-not-allowed" : "bg-emerald-600 hover:bg-emerald-700"}`}
-                    onClick={() => fileInputRef.current?.click()}
-                    disabled={isImporting}
-                >
-                    {isImporting ? "Importing..." : "Import Farmer"}
-                </button>
-                <button
-                    className={`text-white px-5 py-2.5 rounded-lg shadow-md transition-all font-medium ${isImporting ? "bg-indigo-400 cursor-not-allowed" : "bg-indigo-600 hover:bg-indigo-700"}`}
-                    onClick={() => tailoredFileInputRef.current?.click()}
-                    disabled={isImporting}
-                >
-                    {isImporting ? "Importing..." : "Import Agro Excel"}
-                </button>
                 {lastImportedIds.length > 0 && (
                     <button
                         className="bg-red-500 text-white px-5 py-2.5 rounded-lg hover:bg-red-600 shadow-md transition-all font-medium"
