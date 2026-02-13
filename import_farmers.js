@@ -3,13 +3,15 @@ const { ConvexHttpClient } = require('convex/browser');
 const fs = require('fs');
 
 // Read .env.local manually
-let convexUrl = '';
-try {
-    const envFile = fs.readFileSync('.env.local', 'utf8');
-    const match = envFile.match(/NEXT_PUBLIC_CONVEX_URL=(.+)/);
-    if (match) convexUrl = match[1].trim();
-} catch (e) {
-    console.warn('Could not read .env.local', e.message);
+let convexUrl = process.env.CONVEX_URL || process.env.PROCESS_CONVEX_URL || '';
+if (!convexUrl) {
+    try {
+        const envFile = fs.readFileSync('.env.local', 'utf8');
+        const match = envFile.match(/NEXT_PUBLIC_CONVEX_URL=(.+)/);
+        if (match) convexUrl = match[1].trim();
+    } catch (e) {
+        console.warn('Could not read .env.local', e.message);
+    }
 }
 
 if (!convexUrl) {
