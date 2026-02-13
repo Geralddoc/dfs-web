@@ -471,10 +471,15 @@ export default function FarmersPage() {
                 console.log(`Import: Total Farmers collected: ${farmersToAdd.length}`);
 
                 if (farmersToAdd.length === 0) {
-                    const sampleHeaders = farmersToAdd.length === 0 && wb.SheetNames.length > 0 ?
+                    const sampleHeaders = wb.SheetNames.length > 0 ?
                         Object.keys(XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]])[0] || {}).join(", ") : "None found";
 
-                    alert(`IMPORT DIAGNOSTIC:\n- Zero records found.\n- Detected headers: ${sampleHeaders}\n- Check if your name column is one of: Name, Farmer, Business.\n- Searched ${wb.SheetNames.length} sheets.`);
+                    alert(`IMPORT FAILED: No farmers detected in ${file.name}.\n\n` +
+                        `Possible Reasons:\n` +
+                        `1. Incorrect Sheet: Searched ${wb.SheetNames.length} sheets (${wb.SheetNames.join(", ")}).\n` +
+                        `2. Missing Headers: We look for column names like 'Name', 'Address', 'Contact', or 'District'.\n` +
+                        `3. Headers Detected in first sheet: ${sampleHeaders}\n\n` +
+                        `Please check your Excel file column names and try again!`);
                     setIsImporting(false);
                     return;
                 }
@@ -597,7 +602,7 @@ export default function FarmersPage() {
                         onClick={() => tailoredAgroFileInputRef.current?.click()}
                         disabled={isImporting}
                     >
-                        {isImporting ? "Importing..." : "Import Agro Excel"}
+                        {isImporting ? "Importing..." : "Import Agro"}
                     </button>
                     <button
                         className="bg-red-800 text-white px-5 py-2.5 rounded-lg hover:bg-black shadow-md transition-all font-medium"
