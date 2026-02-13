@@ -131,12 +131,21 @@ export default function AgroProcessorsPage() {
             return;
         }
 
-        await addProcessor({
-            ...newProcessor,
-            commodities: newProcessor.commodities.split(",").map(c => c.trim()).filter(c => c !== ""),
-        });
-        setNewProcessor({ name: "", businessName: "", address: "", contact: "", district: "", commodities: "" });
-        alert("Agro Processor added successfully!");
+        try {
+            const payload = {
+                ...newProcessor,
+                commodities: newProcessor.commodities.split(",").map(c => c.trim()).filter(c => c !== ""),
+            };
+            console.log("Attempting to add agro processor with payload:", payload);
+
+            await addProcessor(payload);
+            console.log("Agro processor added successfully to Convex");
+            setNewProcessor({ name: "", businessName: "", address: "", contact: "", district: "", commodities: "" });
+            alert("Agro Processor added successfully!");
+        } catch (error: any) {
+            console.error("CRITICAL: Failed to add agro processor:", error);
+            alert(`Error adding agro processor: ${error.message || "Unknown error"}. Check console for details.`);
+        }
     };
 
     const handleUpdate = async (id: Id<"agroProcessors">) => {

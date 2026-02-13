@@ -133,16 +133,22 @@ export default function FarmersPage() {
                 return;
             }
 
+            console.log("Attempting to add farmer with payload:", {
+                ...newFarmer,
+                commodities: newFarmer.commodities.split(",").map(commodity => commodity.trim()).filter(commodity => commodity !== ""),
+            });
+
             await addFarmer({
                 ...newFarmer,
                 commodities: newFarmer.commodities.split(",").map(commodity => commodity.trim()).filter(commodity => commodity !== ""),
             });
+            console.log("Farmer added successfully to Convex");
             setNewFarmer({ name: "", address: "", contact: "", commodities: "" });
             setShowFarmerForm(false);
             alert("Farmer added successfully!");
         } catch (error: any) {
-            console.error("Failed to add farmer:", error);
-            alert(`Error adding farmer: ${error.message || "Unknown error"}`);
+            console.error("CRITICAL: Failed to add farmer:", error);
+            alert(`Error adding farmer: ${error.message || "Unknown error"}. Check console for details.`);
         }
     };
 
@@ -194,7 +200,7 @@ export default function FarmersPage() {
                 return;
             }
 
-            await addAgroProcessor({
+            const payload = {
                 name: newProcessor.name,
                 businessName: newProcessor.businessName,
                 address: newProcessor.address,
@@ -203,13 +209,17 @@ export default function FarmersPage() {
                 commodities: newProcessor.commodities.split(",").map(c => c.trim()).filter(c => c !== ""),
                 date: newProcessor.date,
                 remarks: newProcessor.remarks
-            });
+            };
+            console.log("Attempting to add agro processor with payload:", payload);
+
+            await addAgroProcessor(payload);
+            console.log("Agro processor added successfully to Convex");
             setShowAgroForm(false);
             setNewProcessor({ name: "", businessName: "", address: "", contact: "", district: "", commodities: "", date: "", remarks: "" });
             alert("Agro Processor added successfully!");
         } catch (error: any) {
-            console.error("Failed to add agro processor:", error);
-            alert(`Error adding agro processor: ${error.message || "Unknown error"}`);
+            console.error("CRITICAL: Failed to add agro processor:", error);
+            alert(`Error adding agro processor: ${error.message || "Unknown error"}. Check console for details.`);
         }
     };
 
