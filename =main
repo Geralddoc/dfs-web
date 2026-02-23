@@ -1,44 +1,44 @@
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 
-// Schema matching src/app/farmers/page.tsx import logic
-const processorSchema = {
-    businessName: v.string(),
-    contactPerson: v.optional(v.string()), // Made optional as per frontend default fallback
+// Backend updated on 2026-02-19 to force deployment sync
+
+// Schema based on src/app/farmers/page.tsx usage
+const farmerSchema = {
+    fullName: v.string(),
     location: v.string(),
     contactNumber: v.string(),
-    processingCapacity: v.optional(v.string()),
-    specialization: v.array(v.string()),
-    certificationStatus: v.optional(v.string()),
-    // Optional fields for flexibility and future proofing
-    email: v.optional(v.string()),
+    districts: v.array(v.string()),
+    commodities: v.array(v.string()),
+    preferredMarkets: v.optional(v.array(v.string())),
+    certifications: v.optional(v.array(v.string())),
     status: v.optional(v.string()),
-    remarks: v.optional(v.string()),
 };
 
 export const get = query({
     args: {},
     handler: async (ctx) => {
-        return await ctx.db.query("agroProcessors").collect();
+        return await ctx.db.query("farmers").collect();
     },
 });
 
 export const create = mutation({
-    args: processorSchema,
+    args: farmerSchema,
     handler: async (ctx, args) => {
-        const id = await ctx.db.insert("agroProcessors", args as any);
+        const id = await ctx.db.insert("farmers", args);
+        // Optional: Add audit log if needed, but keeping it simple for now
         return id;
     },
 });
 
 export const batchCreate = mutation({
     args: {
-        processors: v.array(v.object(processorSchema)),
+        farmers: v.array(v.object(farmerSchema)),
     },
     handler: async (ctx, args) => {
         const ids = [];
-        for (const processor of args.processors) {
-            const id = await ctx.db.insert("agroProcessors", processor as any);
+        for (const farmer of args.farmers) {
+            const id = await ctx.db.insert("farmers", farmer);
             ids.push(id);
         }
         return ids;
@@ -46,18 +46,20 @@ export const batchCreate = mutation({
 });
 
 export const remove = mutation({
-    args: { id: v.id("agroProcessors") },
+    args: { id: v.id("farmers") },
     handler: async (ctx, args) => {
         await ctx.db.delete(args.id);
     },
 });
 
+// Keeping these for compatibility if needed, but 'create' and 'batchCreate' are the key ones for the fix
 export const search = query({
     args: { query: v.string() },
     handler: async (ctx, args) => {
         return await ctx.db
-            .query("agroProcessors")
-            .withSearchIndex("search_name", (q) => q.search("businessName", args.query))
+            .query("farmers")
+            .withSearchIndex("search_name", (q) => q.search("fullName", args.query))
             .collect();
     },
 });
+
