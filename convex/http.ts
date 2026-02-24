@@ -7,7 +7,7 @@ const http = httpRouter();
 http.route({
     path: "/importData",
     method: "POST",
-    handler: httpAction(async (ctx, request) => {
+    handler: httpAction(async (ctx: any, request: any) => {
         try {
             // Must handle CORS since the utility is hosted somewhere else (like GitHub Pages or file://)
             if (request.method === "OPTIONS") {
@@ -48,7 +48,7 @@ http.route({
 http.route({
     path: "/importData",
     method: "OPTIONS",
-    handler: httpAction(async (ctx, request) => {
+    handler: httpAction(async (ctx: any, request: any) => {
         return new Response(null, {
             headers: {
                 "Access-Control-Allow-Origin": "*",
@@ -64,7 +64,7 @@ http.route({
 http.route({
     path: "/getFarmers",
     method: "GET",
-    handler: httpAction(async (ctx, request) => {
+    handler: httpAction(async (ctx: any, request: any) => {
         try {
             const farmers = await ctx.runQuery(api.farmers.get);
             return new Response(JSON.stringify(farmers), {
@@ -85,7 +85,7 @@ http.route({
 http.route({
     path: "/getProcessors",
     method: "GET",
-    handler: httpAction(async (ctx, request) => {
+    handler: httpAction(async (ctx: any, request: any) => {
         try {
             const processors = await ctx.runQuery(api.agroProcessors.get);
             return new Response(JSON.stringify(processors), {
