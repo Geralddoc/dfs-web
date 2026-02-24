@@ -60,4 +60,46 @@ http.route({
     }),
 });
 
+// GET Endpoint for Farmers
+http.route({
+    path: "/getFarmers",
+    method: "GET",
+    handler: httpAction(async (ctx, request) => {
+        try {
+            const farmers = await ctx.runQuery(api.farmers.get);
+            return new Response(JSON.stringify(farmers), {
+                status: 200,
+                headers: {
+                    "Content-Type": "application/json",
+                    "Access-Control-Allow-Origin": "*",
+                },
+            });
+        } catch (e) {
+            console.error(e);
+            return new Response("Error fetching farmers", { status: 500, headers: { "Access-Control-Allow-Origin": "*" } });
+        }
+    }),
+});
+
+// GET Endpoint for Processors
+http.route({
+    path: "/getProcessors",
+    method: "GET",
+    handler: httpAction(async (ctx, request) => {
+        try {
+            const processors = await ctx.runQuery(api.agroProcessors.get);
+            return new Response(JSON.stringify(processors), {
+                status: 200,
+                headers: {
+                    "Content-Type": "application/json",
+                    "Access-Control-Allow-Origin": "*",
+                },
+            });
+        } catch (e) {
+            console.error(e);
+            return new Response("Error fetching processors", { status: 500, headers: { "Access-Control-Allow-Origin": "*" } });
+        }
+    }),
+});
+
 export default http;
